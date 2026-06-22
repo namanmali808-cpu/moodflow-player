@@ -153,13 +153,11 @@ public class MediaControlsPlugin extends Plugin {
                 .setShowWhen(false)
                 .setPriority(NotificationCompat.PRIORITY_LOW);
 
-        int prevIcon = Build.VERSION.SDK_INT >= 21 ? android.R.drawable.ic_media_previous : android.R.drawable.ic_menu_previous;
         int playIcon = isPlaying ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play;
-        int nextIcon = Build.VERSION.SDK_INT >= 21 ? android.R.drawable.ic_media_next : android.R.drawable.ic_menu_next;
 
-        builder.addAction(prevIcon, "Previous", pendingBroadcast(ACTION_PREV));
+        builder.addAction(0, "Previous", pendingBroadcast(ACTION_PREV));
         builder.addAction(playIcon, isPlaying ? "Pause" : "Play", pendingBroadcast(isPlaying ? ACTION_PAUSE : ACTION_PLAY));
-        builder.addAction(nextIcon, "Next", pendingBroadcast(ACTION_NEXT));
+        builder.addAction(0, "Next", pendingBroadcast(ACTION_NEXT));
 
         notificationManager.notify(notifId, builder.build());
     }
