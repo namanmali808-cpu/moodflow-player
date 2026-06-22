@@ -1,6 +1,6 @@
 {
-  "versionCode": 2,
-  "versionName": "1.0.1",
-  "apkUrl": "https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.0.1/app-debug.apk",
-  "releaseNotes": "Auto-update support added"
+  "versionCode": 3,
+  "versionName": "1.0.2",
+  "apkUrl": "https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.0.2/app-debug.apk",
+  "releaseNotes": "Instant premium load, no auth screen flash"
 }
