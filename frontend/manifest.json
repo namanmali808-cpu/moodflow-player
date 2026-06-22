@@ -1,0 +1,17 @@
+{
+  "name": "MoodFlow",
+  "short_name": "MoodFlow",
+  "description": "YouTube Mood Player - Music that matches your mood",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#08080f",
+  "theme_color": "#7c3aed",
+  "orientation": "portrait",
+  "categories": ["music", "entertainment", "lifestyle"],
+  "icons": [
+    { "src": "/icon-144.png", "sizes": "144x144", "type": "image/png" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
