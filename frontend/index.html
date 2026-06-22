@@ -75,7 +75,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .qi .qn{font-size:10px;opacity:.3;min-width:20px;text-align:right}
 .qi.qiNow{background:rgba(129,140,248,.1);border:1px solid rgba(129,140,248,.15)}
 .qi.qiNow .qt{color:#818cf8;font-weight:600}
-#authScrn{position:fixed;top:0;left:0;width:100%;height:100%;z-index:200;display:flex;justify-content:center;align-items:center;background:#08080f;flex-direction:column;padding:24px}
+#authScrn{position:fixed;top:0;left:0;width:100%;height:100%;z-index:200;display:none;justify-content:center;align-items:center;background:#08080f;flex-direction:column;padding:24px}
 #authScrn.hidden{display:none}
 #authScrn .abox{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);border-radius:28px;padding:32px;width:100%;max-width:360px;text-align:center;backdrop-filter:blur(12px);box-shadow:0 8px 48px rgba(0,0,0,.15)}
 #authScrn h2{font-size:26px;font-weight:800;margin-bottom:4px;background:linear-gradient(135deg,#818cf8,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
@@ -1062,7 +1062,7 @@ function authClick() {
   }
 }
 
-function showAuth() { show('authScrn', 'block'); show('mainApp', 'none'); }
+function showAuth() { show('authScrn', 'flex'); show('mainApp', 'none'); }
 
 var menuOpen = false;
 function toggleMenu() {
@@ -1107,11 +1107,6 @@ function setPremium() {
     if(favB) favB.style.display = 'inline';
     show('favListBtn', 'flex');
     updateFavCount();
-    return;
-  }
-  if(currentUser.email === 'namanmali808@gmail.com') {
-    document.body.classList.add('premium');
-    if(badge) badge.style.display = 'inline';
     return;
   }
   if(userData && userData.expires && userData.expires.toDate) {
@@ -1189,6 +1184,7 @@ if(firebaseAuth) {
         currentUser = user;
         show('authScrn', 'none');
         show('mainApp', 'block');
+        setPremium();
         txt('status', user.email);
         loadUserData(user.uid);
         loadYT();
