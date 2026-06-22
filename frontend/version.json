@@ -1,6 +1,6 @@
 {
-  "versionCode": 7,
-  "versionName": "1.0.6",
-  "apkUrl": "https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.0.6/app-debug-v1.0.6.apk",
-  "releaseNotes": "Lock screen controls + notification + background playback"
+  "versionCode": 8,
+  "versionName": "1.0.7",
+  "apkUrl": "https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.0.7/app-debug.apk",
+  "releaseNotes": "Fixed background playback: song continues when screen locked or app minimised. Foreground service with persistent notification + lock screen controls."
 }
