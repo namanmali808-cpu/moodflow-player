@@ -1335,18 +1335,23 @@ function signOut() {
   if(currentUser && confirm('Sign out?')) { clearPremCache(); firebaseAuth.signOut(); }
 }
 
-var APP_VERSION = 5;
+var APP_VERSION = 6;
 var updateInfo = null;
 
 function checkUpdate() {
-  fetch('https://yt-mood-player-naman.web.app/version.json?' + Date.now()).then(function(r) { return r.json(); }).then(function(d) {
-    if(d.versionCode && d.versionCode > APP_VERSION && d.apkUrl) {
-      updateInfo = d;
-      show('updateScrn', 'flex');
-      txt('updateVersion', 'v' + d.versionName + ' available');
-      txt('updateNotes', d.releaseNotes || 'Bug fixes & improvements');
-    }
-  }).catch(function() {});
+  if(firestoreDb) {
+    firestoreDb.collection('app_updates').doc('current').get().then(function(doc) {
+      if(doc.exists) {
+        var d = doc.data();
+        if(d.versionCode && d.versionCode > APP_VERSION && d.apkUrl) {
+          updateInfo = d;
+          show('updateScrn', 'flex');
+          txt('updateVersion', 'v' + d.versionName + ' available');
+          txt('updateNotes', d.releaseNotes || 'Bug fixes & improvements');
+        }
+      }
+    }).catch(function() {});
+  }
 }
 
 function doUpdate() {
