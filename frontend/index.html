@@ -1334,15 +1334,15 @@ function signOut() {
   if(currentUser && confirm('Sign out?')) { clearPremCache(); firebaseAuth.signOut(); }
 }
 
-var APP_VERSION = 3;
+var APP_VERSION = 4;
 var updateInfo = null;
 
 function checkUpdate() {
-  fetch('/version.json?' + Date.now()).then(function(r) { return r.json(); }).then(function(d) {
+  fetch('https://yt-mood-player-naman.web.app/version.json?' + Date.now()).then(function(r) { return r.json(); }).then(function(d) {
     if(d.versionCode && d.versionCode > APP_VERSION && d.apkUrl) {
       updateInfo = d;
       show('updateScrn', 'flex');
-      txt('updateVersion', 'v' + d.versionName + ' (current: v1.0.0)');
+      txt('updateVersion', 'v' + d.versionName + ' (current: v' + APP_VERSION + '.0.0)');
       txt('updateNotes', d.releaseNotes || 'Bug fixes & improvements');
     }
   }).catch(function() {});
