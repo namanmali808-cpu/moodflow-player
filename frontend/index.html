@@ -1090,6 +1090,8 @@ document.addEventListener('click', function(e) {
   if(menuOpen && !e.target.closest('#menuBtn') && !e.target.closest('#userMenu')) closeMenu();
 });
 
+function cachePremium(email, expires) { try { localStorage.setItem('mf_prem', JSON.stringify({e:email,x:expires})); } catch(e) {} }
+function clearPremCache() { try { localStorage.removeItem('mf_prem'); } catch(e) {} }
 function setPremium() {
   document.body.classList.remove('premium');
   var badge = id('crownBadge');
@@ -1109,14 +1111,26 @@ function setPremium() {
     updateFavCount();
     return;
   }
+  var prem = false;
+  try {
+    var c = JSON.parse(localStorage.getItem('mf_prem') || '{}');
+    if(c.e === currentUser.email && c.x > Date.now()) { prem = true; }
+  } catch(e) {}
   if(userData && userData.expires && userData.expires.toDate) {
-    if(Date.now() <= userData.expires.toDate().getTime()) {
-      document.body.classList.add('premium');
-      if(badge) badge.style.display = 'inline';
-      if(favB) favB.style.display = 'inline';
-      show('favListBtn', 'flex');
-      updateFavCount();
+    var exp = userData.expires.toDate().getTime();
+    if(Date.now() <= exp) {
+      prem = true;
+      cachePremium(currentUser.email, exp);
+    } else {
+      clearPremCache();
     }
+  }
+  if(prem) {
+    document.body.classList.add('premium');
+    if(badge) badge.style.display = 'inline';
+    if(favB) favB.style.display = 'inline';
+    show('favListBtn', 'flex');
+    updateFavCount();
   }
   updateMenuSub();
 }
@@ -1317,7 +1331,7 @@ function paySub() {
 function closeSub() { show('subScrn', 'none'); txt('status', 'Trial ended. Subscribe to continue.'); }
 
 function signOut() {
-  if(currentUser && confirm('Sign out?')) firebaseAuth.signOut();
+  if(currentUser && confirm('Sign out?')) { clearPremCache(); firebaseAuth.signOut(); }
 }
 
 var APP_VERSION = 2;
