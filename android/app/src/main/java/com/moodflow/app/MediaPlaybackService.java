@@ -21,10 +21,10 @@ public class MediaPlaybackService extends Service {
 
     private static final String CHANNEL_ID = "moodflow_media";
     private static final int NOTIF_ID = 1001;
-    private static final String ACTION_PLAY = "com.moodflow.app.PLAY";
-    private static final String ACTION_PAUSE = "com.moodflow.app.PAUSE";
-    private static final String ACTION_NEXT = "com.moodflow.app.NEXT";
-    private static final String ACTION_PREV = "com.moodflow.app.PREV";
+    private static final String ACTION_PLAY = "com.moodflow.app.media.PLAY";
+    private static final String ACTION_PAUSE = "com.moodflow.app.media.PAUSE";
+    private static final String ACTION_NEXT = "com.moodflow.app.media.NEXT";
+    private static final String ACTION_PREV = "com.moodflow.app.media.PREV";
 
     private MediaSession mediaSession;
     private String currentTitle = "MoodFlow";
@@ -77,19 +77,11 @@ public class MediaPlaybackService extends Service {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
-            if (ACTION_PLAY.equals(action)) { isPlaying = true; notifyJS("mediaPlay"); }
-            else if (ACTION_PAUSE.equals(action)) { isPlaying = false; notifyJS("mediaPause"); }
-            else if (ACTION_NEXT.equals(action)) notifyJS("mediaNext");
-            else if (ACTION_PREV.equals(action)) notifyJS("mediaPrev");
+            if (ACTION_PLAY.equals(action)) isPlaying = true;
+            else if (ACTION_PAUSE.equals(action)) isPlaying = false;
             updateNotification();
         }
     };
-
-    private void notifyJS(String event) {
-        Intent i = new Intent(event);
-        i.setPackage(getPackageName());
-        sendBroadcast(i);
-    }
 
     private Notification buildNotification() {
         Intent launchIntent = getPackageManager().getLaunchIntentForPackage(getPackageName());
