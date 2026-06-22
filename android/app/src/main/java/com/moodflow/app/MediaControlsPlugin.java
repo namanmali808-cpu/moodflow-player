@@ -1,6 +1,5 @@
 package com.moodflow.app;
 
-import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -8,14 +7,10 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.media.MediaMetadata;
-import android.media.Rating;
 import android.media.session.MediaSession;
 import android.media.session.PlaybackState;
 import android.os.Build;
-import android.os.ResultReceiver;
 
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
@@ -76,6 +71,8 @@ public class MediaControlsPlugin extends Plugin {
         filter.addAction(ACTION_PAUSE);
         filter.addAction(ACTION_NEXT);
         filter.addAction(ACTION_PREV);
+        int flags = 0;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) flags = Context.RECEIVER_NOT_EXPORTED;
         ctx.registerReceiver(new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -85,7 +82,7 @@ public class MediaControlsPlugin extends Plugin {
                 else if (ACTION_NEXT.equals(action)) notifyJS("mediaNext", null);
                 else if (ACTION_PREV.equals(action)) notifyJS("mediaPrev", null);
             }
-        }, filter, Context.RECEIVER_NOT_EXPORTED);
+        }, filter, flags);
     }
 
     private void notifyJS(String event, JSObject data) {
@@ -97,7 +94,6 @@ public class MediaControlsPlugin extends Plugin {
     public void updateMedia(PluginCall call) {
         String title = call.getString("title", "MoodFlow");
         String artist = call.getString("artist", "");
-        String thumbUrl = call.getString("thumbUrl", "");
 
         mediaSession.setMetadata(new MediaMetadata.Builder()
                 .putString(MediaMetadata.METADATA_KEY_TITLE, title)
@@ -112,7 +108,7 @@ public class MediaControlsPlugin extends Plugin {
                         PlaybackState.ACTION_STOP)
                 .build());
 
-        showNotification(title, artist, thumbUrl);
+        showNotification(title, artist);
         call.resolve();
     }
 
@@ -130,6 +126,7 @@ public class MediaControlsPlugin extends Plugin {
         JSObject meta = new JSObject();
         meta.put("playing", isPlaying);
         notifyJS("mediaState", meta);
+        showNotification(null, null);
         call.resolve();
     }
 
@@ -141,7 +138,7 @@ public class MediaControlsPlugin extends Plugin {
         call.resolve();
     }
 
-    private void showNotification(String title, String artist, String thumbUrl) {
+    private void showNotification(String title, String artist) {
         Context ctx = getContext();
         Intent intent = ctx.getPackageManager().getLaunchIntentForPackage(ctx.getPackageName());
         PendingIntent contentIntent = PendingIntent.getActivity(ctx, 0, intent,
@@ -149,36 +146,22 @@ public class MediaControlsPlugin extends Plugin {
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(ctx, channelId)
                 .setSmallIcon(android.R.drawable.ic_media_play)
-                .setContentTitle(title)
-                .setContentText(artist)
+                .setContentTitle(title != null ? title : "MoodFlow")
+                .setContentText(artist != null ? artist : "")
                 .setContentIntent(contentIntent)
                 .setOngoing(isPlaying)
                 .setShowWhen(false)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
-                .setStyle(new androidx.media.app.NotificationCompat.MediaStyle()
-                        .setMediaSession(mediaSession.getSessionToken())
-                        .setShowActionsInCompactView(0, 1, 2)
-                        .setShowCancelButton(true));
+                .setPriority(NotificationCompat.PRIORITY_LOW);
 
-        builder.addAction(android.R.drawable.ic_media_previous, "Previous",
-                pendingBroadcast(ACTION_PREV));
-        if (isPlaying) {
-            builder.addAction(android.R.drawable.ic_media_pause, "Pause",
-                    pendingBroadcast(ACTION_PAUSE));
-        } else {
-            builder.addAction(android.R.drawable.ic_media_play, "Play",
-                    pendingBroadcast(ACTION_PLAY));
-        }
-        builder.addAction(android.R.drawable.ic_media_next, "Next",
-                pendingBroadcast(ACTION_NEXT));
+        int prevIcon = Build.VERSION.SDK_INT >= 21 ? android.R.drawable.ic_media_previous : android.R.drawable.ic_menu_previous;
+        int playIcon = isPlaying ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play;
+        int nextIcon = Build.VERSION.SDK_INT >= 21 ? android.R.drawable.ic_media_next : android.R.drawable.ic_menu_next;
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            try {
-                NotificationManagerCompat.from(ctx).notify(notifId, builder.build());
-            } catch (Exception ignored) {}
-        } else {
-            notificationManager.notify(notifId, builder.build());
-        }
+        builder.addAction(prevIcon, "Previous", pendingBroadcast(ACTION_PREV));
+        builder.addAction(playIcon, isPlaying ? "Pause" : "Play", pendingBroadcast(isPlaying ? ACTION_PAUSE : ACTION_PLAY));
+        builder.addAction(nextIcon, "Next", pendingBroadcast(ACTION_NEXT));
+
+        notificationManager.notify(notifId, builder.build());
     }
 
     private PendingIntent pendingBroadcast(String action) {
