@@ -152,7 +152,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 </style>
 </head>
 <body>
-
+<script>try{var _c=JSON.parse(localStorage.getItem('mf_prem')||'{}');if(_c.e&&_c.x>Date.now())document.body.classList.add('premium');}catch(e){}</script>
 <div id="ytWrap"><div id="ytP"></div></div>
 <div id="premiumGlow" style="display:none;position:fixed;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at 50% 50%,rgba(147,51,234,.015) 0%,transparent 50%);pointer-events:none;z-index:-1"></div>
 <div id="micOv"><div class="b">🎤</div><div class="tx" id="micTxt">Listening...</div></div>
@@ -198,7 +198,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
   </div>
 </div>
 
-<div class="container" id="mainApp">
+<div class="container" id="mainApp" style="display:none">
   <div class="header">
     <h1>♪ MoodFlow<span id="proBadge" style="display:none;font-size:10px;font-weight:800;vertical-align:super;margin-left:6px;background:linear-gradient(135deg,#9333ea,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:1px">✦ PRO</span></h1>
     <div id="headerLine" style="width:40px;height:3px;border-radius:4px;margin:6px auto 0;background:linear-gradient(90deg,rgba(129,140,248,.3),rgba(147,51,234,.5))"></div>
@@ -1197,7 +1197,6 @@ if(firebaseAuth) {
       if(user) {
         currentUser = user;
         show('authScrn', 'none');
-        show('mainApp', 'block');
         setPremium();
         txt('status', user.email);
         loadUserData(user.uid);
@@ -1278,7 +1277,8 @@ function loadUserData(uid) {
       startTrial(uid);
     }
     setPremium();
-  }).catch(function() { txt('status', 'Error loading data'); });
+    show('mainApp', 'block');
+  }).catch(function() { show('mainApp', 'block'); txt('status', 'Error loading data'); });
 }
 
 function startTrial(uid) {
@@ -1294,6 +1294,7 @@ function startTrial(uid) {
     show('subScrn', 'none');
     txt('status', 'Free trial started! Enjoy 28 days.');
     setPremium();
+    show('mainApp', 'block');
   });
 }
 
@@ -1334,7 +1335,7 @@ function signOut() {
   if(currentUser && confirm('Sign out?')) { clearPremCache(); firebaseAuth.signOut(); }
 }
 
-var APP_VERSION = 4;
+var APP_VERSION = 5;
 var updateInfo = null;
 
 function checkUpdate() {
@@ -1342,7 +1343,7 @@ function checkUpdate() {
     if(d.versionCode && d.versionCode > APP_VERSION && d.apkUrl) {
       updateInfo = d;
       show('updateScrn', 'flex');
-      txt('updateVersion', 'v' + d.versionName + ' (current: v' + APP_VERSION + '.0.0)');
+      txt('updateVersion', 'v' + d.versionName + ' available');
       txt('updateNotes', d.releaseNotes || 'Bug fixes & improvements');
     }
   }).catch(function() {});

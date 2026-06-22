@@ -1,6 +1,6 @@
 {
-  "versionCode": 4,
-  "versionName": "1.0.3",
-  "apkUrl": "https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.0.3/app-debug.apk",
-  "releaseNotes": "Fix auto-update fetch URL for APK"
+  "versionCode": 5,
+  "versionName": "1.0.4",
+  "apkUrl": "https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.0.4/app-debug.apk",
+  "releaseNotes": "Zero-delay premium load via inline script"
 }
