@@ -9,17 +9,15 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 
 import androidx.core.content.ContextCompat;
+import androidx.core.app.ActivityCompat;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
-import com.getcapacitor.annotation.Permission;
 
-@CapacitorPlugin(name = "MediaControls", permissions = {
-    @Permission(strings = { Manifest.permission.POST_NOTIFICATIONS }, alias = "notification", defValue = false)
-})
+@CapacitorPlugin(name = "MediaControls")
 public class MediaControlsPlugin extends Plugin {
 
     private static final String ACTION_PLAY = "com.moodflow.app.media.PLAY";
@@ -32,6 +30,7 @@ public class MediaControlsPlugin extends Plugin {
     private static final String FORWARD_PREV = "mediaPrev";
 
     private boolean serviceRunning = false;
+    private boolean permissionRequested = false;
 
     @Override
     public void load() {
@@ -45,12 +44,15 @@ public class MediaControlsPlugin extends Plugin {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) flags = Context.RECEIVER_NOT_EXPORTED;
         getContext().registerReceiver(forwardReceiver, filter, flags);
 
-        // Auto-request notification permission on Android 13+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissionForAlias("notification", null);
-            }
-        }
+        requestNotifPermission();
+    }
+
+    private void requestNotifPermission() {
+        if (permissionRequested) return;
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return;
+        if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return;
+        permissionRequested = true;
+        ActivityCompat.requestPermissions(getActivity(), new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1001);
     }
 
     private final BroadcastReceiver forwardReceiver = new BroadcastReceiver() {
@@ -67,6 +69,8 @@ public class MediaControlsPlugin extends Plugin {
 
     @PluginMethod
     public void updateMedia(PluginCall call) {
+        requestNotifPermission();
+
         String title = call.getString("title", "MoodFlow");
         String artist = call.getString("artist", "");
         boolean playing = call.getBoolean("playing", false);
