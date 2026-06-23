@@ -1,18 +1,25 @@
 package com.moodflow.app;
 
+import android.Manifest;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.os.Build;
+
+import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
 
-@CapacitorPlugin(name = "MediaControls")
+@CapacitorPlugin(name = "MediaControls", permissions = {
+    @Permission(strings = { Manifest.permission.POST_NOTIFICATIONS }, alias = "notification", defValue = false)
+})
 public class MediaControlsPlugin extends Plugin {
 
     private static final String ACTION_PLAY = "com.moodflow.app.media.PLAY";
@@ -37,6 +44,13 @@ public class MediaControlsPlugin extends Plugin {
         int flags = 0;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) flags = Context.RECEIVER_NOT_EXPORTED;
         getContext().registerReceiver(forwardReceiver, filter, flags);
+
+        // Auto-request notification permission on Android 13+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissionForAlias("notification", null);
+            }
+        }
     }
 
     private final BroadcastReceiver forwardReceiver = new BroadcastReceiver() {
