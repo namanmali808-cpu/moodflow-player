@@ -1,6 +1,6 @@
 {
-  "versionCode": 11,
-  "versionName": "1.1.0",
-  "apkUrl": "https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.1.0/app-debug.apk",
-  "releaseNotes": "Background playback fix: WebView kept alive when screen locks + visibility watchdog resumes paused player"
+  "versionCode": 12,
+  "versionName": "1.1.1",
+  "apkUrl": "https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.1.1/app-debug.apk",
+  "releaseNotes": "Fixed update button: auto-download without opening link. Background playback + lock screen + notification."
 }

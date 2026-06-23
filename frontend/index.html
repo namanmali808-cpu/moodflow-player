@@ -1389,7 +1389,7 @@ function signOut() {
   if(currentUser && confirm('Sign out?')) { clearPremCache(); firebaseAuth.signOut(); }
 }
 
-var APP_VERSION = 11;
+var APP_VERSION = 12;
 var updateInfo = null;
 
 function checkUpdate() {
@@ -1412,28 +1412,41 @@ function doUpdate() {
   if(!updateInfo || !updateInfo.apkUrl) return;
   id('updateBtn').disabled = true;
   id('updateBtn').textContent = '⏳ Downloading...';
-  if(window.MediaBridge) {
-    window.MediaBridge.downloadApk(updateInfo.apkUrl);
-    id('updateBtn').textContent = '⬇ Download started... Check notification';
-    setTimeout(function(){ id('updateBtn').disabled = false; }, 3000);
-  } else try {
-    var AppUpdate = Capacitor.Plugins.AppUpdate;
-    AppUpdate.downloadAndInstall({ url: updateInfo.apkUrl }).then(function() {
-      id('updateBtn').textContent = '✅ Done! Install now.';
+  // Try native bridge first (APK)
+  if(window.MediaBridge && window.MediaBridge.downloadApk) {
+    try {
+      window.MediaBridge.downloadApk(updateInfo.apkUrl);
+      id('updateBtn').textContent = '⬇ Download started... Check notification';
       id('updateBtn').disabled = false;
-    }).catch(function(e) {
-      id('updateBtn').textContent = '⬇ Try Again';
-      id('updateBtn').disabled = false;
-      txt('status', 'Update failed: ' + e.message);
-    });
-  } catch(e) {
-    id('updateBtn').textContent = '⬇ Open Link';
-    id('updateBtn').disabled = false;
-    var a = document.createElement('a');
-    a.href = updateInfo.apkUrl;
-    a.target = '_blank';
-    a.click();
+      return;
+    } catch(ex) {}
   }
+  // Try Capacitor plugin (APK fallback)
+  try {
+    if(window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.AppUpdate) {
+      Capacitor.Plugins.AppUpdate.downloadAndInstall({ url: updateInfo.apkUrl }).then(function() {
+        id('updateBtn').textContent = '✅ Done! Install now.';
+        id('updateBtn').disabled = false;
+      }).catch(function(e) {
+        id('updateBtn').textContent = '⬇ Download';
+        id('updateBtn').disabled = false;
+        downloadFallback(updateInfo.apkUrl);
+      });
+      return;
+    }
+  } catch(ex) {}
+  // Web fallback: download APK
+  downloadFallback(updateInfo.apkUrl);
+}
+function downloadFallback(url) {
+  id('updateBtn').textContent = '⬇ Download APK';
+  id('updateBtn').disabled = false;
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'MoodFlow.apk';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){ try{document.body.removeChild(a);}catch(e){} }, 2000);
 }
 
 function closeUpdate() { show('updateScrn', 'none'); }
