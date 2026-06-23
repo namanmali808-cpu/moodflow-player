@@ -7,9 +7,11 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.webkit.JavascriptInterface;
+import android.webkit.WebView;
 
-import androidx.core.content.ContextCompat;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -24,17 +26,59 @@ public class MediaControlsPlugin extends Plugin {
     private static final String ACTION_PAUSE = "com.moodflow.app.media.PAUSE";
     private static final String ACTION_NEXT = "com.moodflow.app.media.NEXT";
     private static final String ACTION_PREV = "com.moodflow.app.media.PREV";
-    private static final String FORWARD_PLAY = "mediaPlay";
-    private static final String FORWARD_PAUSE = "mediaPause";
-    private static final String FORWARD_NEXT = "mediaNext";
-    private static final String FORWARD_PREV = "mediaPrev";
 
     private boolean serviceRunning = false;
     private boolean permissionRequested = false;
+    private WebView webView;
+
+    // ---- JavaScriptInterface (direct bridge, bypasses Capacitor plugin system) ----
+    public class MediaJSBridge {
+        @JavascriptInterface
+        public void updateMedia(String title, String artist, boolean playing) {
+            Context ctx = getContext();
+            Intent intent = new Intent(ctx, MediaPlaybackService.class);
+            intent.setAction("UPDATE_META");
+            intent.putExtra("title", title != null ? title : "MoodFlow");
+            intent.putExtra("artist", artist != null ? artist : "");
+            intent.putExtra("playing", playing);
+            startService(ctx, intent);
+            serviceRunning = true;
+        }
+        @JavascriptInterface
+        public void setPlaying(boolean playing) {
+            if (!serviceRunning) return;
+            Intent intent = new Intent(getContext(), MediaPlaybackService.class);
+            intent.setAction("UPDATE_META");
+            intent.putExtra("playing", playing);
+            startService(getContext(), intent);
+        }
+        @JavascriptInterface
+        public void hideMedia() {
+            serviceRunning = false;
+            Intent intent = new Intent(getContext(), MediaPlaybackService.class);
+            intent.setAction("STOP");
+            getContext().startService(intent);
+        }
+    }
+
+    private void startService(Context ctx, Intent intent) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            ctx.startForegroundService(intent);
+        } else {
+            ctx.startService(intent);
+        }
+    }
 
     @Override
     public void load() {
         super.load();
+        requestNotifPermission();
+
+        try {
+            webView = getBridge().getWebView();
+            webView.addJavascriptInterface(new MediaJSBridge(), "MediaBridge");
+        } catch (Exception ignored) {}
+
         IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_PLAY);
         filter.addAction(ACTION_PAUSE);
@@ -43,8 +87,6 @@ public class MediaControlsPlugin extends Plugin {
         int flags = 0;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) flags = Context.RECEIVER_NOT_EXPORTED;
         getContext().registerReceiver(forwardReceiver, filter, flags);
-
-        requestNotifPermission();
     }
 
     private void requestNotifPermission() {
@@ -52,62 +94,53 @@ public class MediaControlsPlugin extends Plugin {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return;
         if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return;
         permissionRequested = true;
-        ActivityCompat.requestPermissions(getActivity(), new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1001);
+        try {
+            ActivityCompat.requestPermissions(getActivity(), new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1001);
+        } catch (Exception ignored) {}
     }
 
     private final BroadcastReceiver forwardReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             String a = intent.getAction();
-            JSObject d = new JSObject();
-            if (ACTION_PLAY.equals(a)) notifyListeners(FORWARD_PLAY, d);
-            else if (ACTION_PAUSE.equals(a)) notifyListeners(FORWARD_PAUSE, d);
-            else if (ACTION_NEXT.equals(a)) notifyListeners(FORWARD_NEXT, d);
-            else if (ACTION_PREV.equals(a)) notifyListeners(FORWARD_PREV, d);
+            String js = null;
+            if (ACTION_PLAY.equals(a)) js = "if(window.mediaOnPlay)mediaOnPlay();";
+            else if (ACTION_PAUSE.equals(a)) js = "if(window.mediaOnPause)mediaOnPause();";
+            else if (ACTION_NEXT.equals(a)) js = "if(window.mediaOnNext)mediaOnNext();";
+            else if (ACTION_PREV.equals(a)) js = "if(window.mediaOnPrev)mediaOnPrev();";
+            if (js != null && webView != null) {
+                final String fjs = js;
+                webView.post(() -> webView.evaluateJavascript(fjs, null));
+            }
         }
     };
 
+    // ---- Capacitor plugin methods kept as fallback ----
     @PluginMethod
     public void updateMedia(PluginCall call) {
-        requestNotifPermission();
-
         String title = call.getString("title", "MoodFlow");
         String artist = call.getString("artist", "");
         boolean playing = call.getBoolean("playing", false);
-
-        Intent intent = new Intent(getContext(), MediaPlaybackService.class);
+        Context ctx = getContext();
+        Intent intent = new Intent(ctx, MediaPlaybackService.class);
         intent.setAction("UPDATE_META");
         intent.putExtra("title", title);
         intent.putExtra("artist", artist);
         intent.putExtra("playing", playing);
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            getContext().startForegroundService(intent);
-        } else {
-            getContext().startService(intent);
-        }
+        startService(ctx, intent);
         serviceRunning = true;
         call.resolve();
     }
-
     @PluginMethod
     public void setPlaying(PluginCall call) {
         boolean playing = call.getBoolean("playing", false);
-        if (!serviceRunning) {
-            call.resolve();
-            return;
-        }
+        if (!serviceRunning) { call.resolve(); return; }
         Intent intent = new Intent(getContext(), MediaPlaybackService.class);
         intent.setAction("UPDATE_META");
         intent.putExtra("playing", playing);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            getContext().startForegroundService(intent);
-        } else {
-            getContext().startService(intent);
-        }
+        startService(getContext(), intent);
         call.resolve();
     }
-
     @PluginMethod
     public void hideMedia(PluginCall call) {
         serviceRunning = false;
