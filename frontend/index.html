@@ -666,6 +666,24 @@ function setupNativeMediaListeners() {
 }
 setupNativeMediaListeners();
 
+// Keep playback alive when screen locks / app backgrounds
+var bgTimer = null;
+function startBgWatch() {
+  stopBgWatch();
+  bgTimer = setInterval(function(){
+    if(!playing || !player) return;
+    try {
+      var st = player.getPlayerState();
+      if(st === 2 && playing) { player.playVideo(); }
+    } catch(ex) {}
+  }, 2000);
+}
+function stopBgWatch() { if(bgTimer) { clearInterval(bgTimer); bgTimer = null; } }
+document.addEventListener('visibilitychange', function(){
+  if(document.hidden) startBgWatch();
+  else stopBgWatch();
+});
+
 function toggleFav() {
   var s = queue[queueIndex];
   if(!s) return;
@@ -1371,7 +1389,7 @@ function signOut() {
   if(currentUser && confirm('Sign out?')) { clearPremCache(); firebaseAuth.signOut(); }
 }
 
-var APP_VERSION = 10;
+var APP_VERSION = 11;
 var updateInfo = null;
 
 function checkUpdate() {
