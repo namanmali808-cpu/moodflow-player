@@ -9,14 +9,12 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
-import android.util.Base64;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 
 import androidx.core.content.FileProvider;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
@@ -80,8 +78,6 @@ public class MediaBridge {
                                 }
                                 install.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                                 ctx.startActivity(install);
-                            } else {
-                                if (c != null) c.close();
                             }
                         }
                     } catch (Exception ignored) {}
@@ -102,11 +98,36 @@ public class MediaBridge {
     }
 
     @JavascriptInterface
+    public void updateMediaWithVid(String title, String artist, String videoId, boolean playing) {
+        Intent intent = new Intent(ctx, MediaPlaybackService.class);
+        intent.setAction("UPDATE_META");
+        intent.putExtra("title", title != null ? title : "MoodFlow");
+        intent.putExtra("artist", artist != null ? artist : "");
+        intent.putExtra("videoId", videoId != null ? videoId : "");
+        intent.putExtra("playing", playing);
+        startService(intent);
+    }
+
+    @JavascriptInterface
     public void setPlaying(boolean playing) {
         Intent intent = new Intent(ctx, MediaPlaybackService.class);
         intent.setAction("UPDATE_META");
         intent.putExtra("playing", playing);
         startService(intent);
+    }
+
+    @JavascriptInterface
+    public void play() {
+        Intent intent = new Intent(MediaPlaybackService.ACTION_PLAY);
+        intent.setPackage(ctx.getPackageName());
+        ctx.sendBroadcast(intent);
+    }
+
+    @JavascriptInterface
+    public void pause() {
+        Intent intent = new Intent(MediaPlaybackService.ACTION_PAUSE);
+        intent.setPackage(ctx.getPackageName());
+        ctx.sendBroadcast(intent);
     }
 
     @JavascriptInterface
@@ -117,7 +138,7 @@ public class MediaBridge {
     }
 
     @JavascriptInterface
-    public void fetchAudioUrl(final String videoId, final String callback) {
+    public void playNativeAudio(final String videoId) {
         new Thread(() -> {
             try {
                 String html = fetchUrl("https://www.youtube.com/watch?v=" + videoId);
@@ -126,14 +147,15 @@ public class MediaBridge {
                     String info = fetchUrl("https://www.youtube.com/get_video_info?video_id=" + videoId);
                     audioUrl = parseAudioUrlFromInfo(info);
                 }
-                String b64 = Base64.encodeToString(audioUrl.getBytes("UTF-8"), Base64.NO_WRAP);
-                final String fb64 = b64;
-                webView.post(() -> webView.evaluateJavascript(
-                    "window." + callback + "('" + videoId + "','" + fb64 + "')", null));
-            } catch (Exception e) {
-                webView.post(() -> webView.evaluateJavascript(
-                    "window." + callback + "('" + videoId + "','')", null));
-            }
+                final String finalUrl = audioUrl;
+                if (!finalUrl.isEmpty()) {
+                    Intent intent = new Intent(ctx, MediaPlaybackService.class);
+                    intent.setAction(MediaPlaybackService.ACTION_PLAY_AUDIO);
+                    intent.putExtra(MediaPlaybackService.EXTRA_AUDIO_URL, finalUrl);
+                    intent.putExtra(MediaPlaybackService.EXTRA_VIDEO_ID, videoId);
+                    startService(intent);
+                }
+            } catch (Exception ignored) {}
         }).start();
     }
 

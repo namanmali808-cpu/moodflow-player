@@ -12,12 +12,12 @@ var firebaseConfig = {apiKey:"AIzaSyAFwUYmVsKE_SSxRBoGxsTFFXclJjSAfl0",authDomai
 firebase.initializeApp(firebaseConfig);
 firebase.auth().signInAnonymously().then(function(){
   firebase.firestore().collection('app_updates').doc('current').set({
-    versionCode: 7,
-    versionName: "1.0.6",
-    apkUrl: "https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.0.6/app-debug.apk",
-    releaseNotes: "Native lock screen + notification media controls. Auto-update from v1.0.5+.",
+    versionCode: 15,
+    versionName: "1.2.0",
+    apkUrl: "https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.2.0/app-debug.apk",
+    releaseNotes: "Native audio extraction + <audio> element background playback. Lock screen controls work with screen off.",
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-  }).then(function(){document.getElementById('status').textContent='Done! versionCode=7 written.';}).catch(function(e){document.getElementById('status').textContent='Error: '+e.message;});
+  }).then(function(){document.getElementById('status').textContent='Done! versionCode=15 written.';}).catch(function(e){document.getElementById('status').textContent='Error: '+e.message;});
 }).catch(function(e){document.getElementById('status').textContent='Auth Error: '+e.message;});
 </script>
 </body></html>

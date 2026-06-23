@@ -25,6 +25,8 @@ public class MediaControlsPlugin extends Plugin {
     private static final String ACTION_PAUSE = "com.moodflow.app.media.PAUSE";
     private static final String ACTION_NEXT = "com.moodflow.app.media.NEXT";
     private static final String ACTION_PREV = "com.moodflow.app.media.PREV";
+    private static final String SONG_ENDED = "com.moodflow.app.media.SONG_ENDED";
+    private static final String AUDIO_STARTED = "com.moodflow.app.media.AUDIO_STARTED";
 
     private boolean permissionRequested = false;
     private WebView webView;
@@ -51,6 +53,8 @@ public class MediaControlsPlugin extends Plugin {
         filter.addAction(ACTION_PAUSE);
         filter.addAction(ACTION_NEXT);
         filter.addAction(ACTION_PREV);
+        filter.addAction(SONG_ENDED);
+        filter.addAction(AUDIO_STARTED);
         int flags = 0;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) flags = Context.RECEIVER_NOT_EXPORTED;
         getContext().registerReceiver(forwardReceiver, filter, flags);
@@ -75,6 +79,8 @@ public class MediaControlsPlugin extends Plugin {
             else if (ACTION_PAUSE.equals(a)) js = "if(window.mediaOnPause)mediaOnPause();";
             else if (ACTION_NEXT.equals(a)) js = "if(window.mediaOnNext)mediaOnNext();";
             else if (ACTION_PREV.equals(a)) js = "if(window.mediaOnPrev)mediaOnPrev();";
+            else if (SONG_ENDED.equals(a)) js = "if(window.sk)sk();";
+            else if (AUDIO_STARTED.equals(a)) js = "if(window.onNativeAudioStart)onNativeAudioStart();";
             if (js != null && webView != null) {
                 final String fjs = js;
                 webView.post(() -> webView.evaluateJavascript(fjs, null));
@@ -93,8 +99,7 @@ public class MediaControlsPlugin extends Plugin {
         intent.putExtra("title", title);
         intent.putExtra("artist", artist);
         intent.putExtra("playing", playing);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(intent);
-        else ctx.startService(intent);
+        startForegroundService(ctx, intent);
         call.resolve();
     }
     @PluginMethod
@@ -103,8 +108,7 @@ public class MediaControlsPlugin extends Plugin {
         Intent intent = new Intent(getContext(), MediaPlaybackService.class);
         intent.setAction("UPDATE_META");
         intent.putExtra("playing", playing);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) getContext().startForegroundService(intent);
-        else getContext().startService(intent);
+        startForegroundService(getContext(), intent);
         call.resolve();
     }
     @PluginMethod
@@ -113,5 +117,10 @@ public class MediaControlsPlugin extends Plugin {
         intent.setAction("STOP");
         getContext().startService(intent);
         call.resolve();
+    }
+
+    private void startForegroundService(Context ctx, Intent intent) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(intent);
+        else ctx.startService(intent);
     }
 }
