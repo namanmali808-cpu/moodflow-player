@@ -11,18 +11,4 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(AppUpdatePlugin.class);
         registerPlugin(MediaControlsPlugin.class);
     }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        // Keep WebView alive for background YouTube playback
-        if (getBridge() != null && getBridge().getWebView() != null) {
-            getBridge().getWebView().postDelayed(() -> {
-                try {
-                    getBridge().getWebView().onResume();
-                    getBridge().getWebView().requestFocus();
-                } catch (Exception ignored) {}
-            }, 300);
-        }
-    }
 }

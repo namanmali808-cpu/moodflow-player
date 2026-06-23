@@ -123,6 +123,17 @@ public class MediaControlsPlugin extends Plugin {
     }
 
     @Override
+    protected void handleOnPause() {
+        super.handleOnPause();
+        // Keep WebView alive when app goes to background (YouTube playback)
+        if (webView != null) {
+            webView.postDelayed(() -> {
+                try { webView.onResume(); } catch (Exception ignored) {}
+            }, 500);
+        }
+    }
+
+    @Override
     public void load() {
         super.load();
         requestNotifPermission();
