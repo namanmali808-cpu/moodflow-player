@@ -9,19 +9,32 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
+import android.util.Base64;
 import android.webkit.JavascriptInterface;
+import android.webkit.WebView;
 
 import androidx.core.content.FileProvider;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLDecoder;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class MediaBridge {
 
     private Context ctx;
+    private WebView webView;
     private long lastDownloadId = -1;
 
-    public MediaBridge(Context context) {
+    public MediaBridge(Context context, WebView wv) {
         this.ctx = context;
+        this.webView = wv;
     }
 
     @JavascriptInterface
@@ -101,6 +114,74 @@ public class MediaBridge {
         Intent intent = new Intent(ctx, MediaPlaybackService.class);
         intent.setAction("STOP");
         ctx.startService(intent);
+    }
+
+    @JavascriptInterface
+    public void fetchAudioUrl(final String videoId, final String callback) {
+        new Thread(() -> {
+            try {
+                String html = fetchUrl("https://www.youtube.com/watch?v=" + videoId);
+                String audioUrl = extractAudioUrl(html);
+                if (audioUrl.isEmpty()) {
+                    String info = fetchUrl("https://www.youtube.com/get_video_info?video_id=" + videoId);
+                    audioUrl = parseAudioUrlFromInfo(info);
+                }
+                String b64 = Base64.encodeToString(audioUrl.getBytes("UTF-8"), Base64.NO_WRAP);
+                final String fb64 = b64;
+                webView.post(() -> webView.evaluateJavascript(
+                    "window." + callback + "('" + videoId + "','" + fb64 + "')", null));
+            } catch (Exception e) {
+                webView.post(() -> webView.evaluateJavascript(
+                    "window." + callback + "('" + videoId + "','')", null));
+            }
+        }).start();
+    }
+
+    private String fetchUrl(String urlStr) throws Exception {
+        URL url = new URL(urlStr);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36");
+        conn.setRequestProperty("Accept-Language", "en-US,en;q=0.9");
+        conn.setConnectTimeout(10000);
+        conn.setReadTimeout(10000);
+        return new BufferedReader(new InputStreamReader(conn.getInputStream()))
+                .lines().collect(Collectors.joining("\n"));
+    }
+
+    private String extractAudioUrl(String html) {
+        Pattern p = Pattern.compile("ytInitialPlayerResponse\\s*=\\s*(\\{.+?\\});\\s*", Pattern.DOTALL);
+        Matcher m = p.matcher(html);
+        if (!m.find()) return "";
+        String json = m.group(1);
+        String[] parts = json.split("\"mimeType\"");
+        for (int i = 0; i < parts.length; i++) {
+            if (parts[i].contains("audio/mp4") && parts[i].contains("\"url\"")) {
+                Matcher um = Pattern.compile("\"url\"\\s*:\\s*\"([^\"]+)\"").matcher(parts[i]);
+                if (um.find()) {
+                    return um.group(1).replace("\\u0026", "&").replace("\\/", "/");
+                }
+            }
+        }
+        Pattern ap = Pattern.compile("\"url\"\\s*:\\s*\"([^\"]+)\"");
+        Matcher am = ap.matcher(json);
+        if (am.find()) {
+            return am.group(1).replace("\\u0026", "&").replace("\\/", "/");
+        }
+        return "";
+    }
+
+    private String parseAudioUrlFromInfo(String info) {
+        try {
+            String decoded = URLDecoder.decode(info, "UTF-8");
+            String[] params = decoded.split("&");
+            for (String param : params) {
+                if (param.startsWith("player_response=")) {
+                    String prJson = param.substring("player_response=".length());
+                    return extractAudioUrl(prJson);
+                }
+            }
+        } catch (UnsupportedEncodingException ignored) {}
+        return "";
     }
 
     private void startService(Intent intent) {
