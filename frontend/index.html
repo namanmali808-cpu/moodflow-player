@@ -1389,7 +1389,7 @@ function signOut() {
   if(currentUser && confirm('Sign out?')) { clearPremCache(); firebaseAuth.signOut(); }
 }
 
-var APP_VERSION = 12;
+var APP_VERSION = 13;
 var updateInfo = null;
 
 function checkUpdate() {
@@ -1439,14 +1439,21 @@ function doUpdate() {
   downloadFallback(updateInfo.apkUrl);
 }
 function downloadFallback(url) {
-  id('updateBtn').textContent = '⬇ Download APK';
-  id('updateBtn').disabled = false;
-  var a = document.createElement('a');
-  a.href = url;
-  a.download = 'MoodFlow.apk';
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(function(){ try{document.body.removeChild(a);}catch(e){} }, 2000);
+  id('updateBtn').textContent = '⏳ Downloading...';
+  fetch(url).then(function(r){ return r.blob(); }).then(function(blob){
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'MoodFlow.apk';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 2000);
+    id('updateBtn').textContent = '✅ Downloaded! Open file to install.';
+    id('updateBtn').disabled = false;
+  }).catch(function(){
+    id('updateBtn').textContent = '⬇ Download APK';
+    id('updateBtn').disabled = false;
+    id('updateNotes').innerHTML = '<a href="' + url + '" target="_blank" style="color:#818cf8;font-size:16px;text-decoration:underline">Tap here to download APK</a>';
+  });
 }
 
 function closeUpdate() { show('updateScrn', 'none'); }

@@ -123,6 +123,28 @@ public class MediaControlsPlugin extends Plugin {
     }
 
     @Override
+    protected void handleOnStart() {
+        super.handleOnStart();
+        // Bridge is guaranteed ready here
+        try {
+            if (webView == null) {
+                webView = getBridge().getWebView();
+                webView.addJavascriptInterface(new MediaJSBridge(), "MediaBridge");
+                // Re-register receiver on the right context (activity context)
+                try { getContext().unregisterReceiver(forwardReceiver); } catch (Exception ignored) {}
+                IntentFilter filter = new IntentFilter();
+                filter.addAction(ACTION_PLAY);
+                filter.addAction(ACTION_PAUSE);
+                filter.addAction(ACTION_NEXT);
+                filter.addAction(ACTION_PREV);
+                int flags = 0;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) flags = Context.RECEIVER_NOT_EXPORTED;
+                getActivity().registerReceiver(forwardReceiver, filter, flags);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    @Override
     protected void handleOnPause() {
         super.handleOnPause();
         // Keep WebView alive when app goes to background (YouTube playback)
@@ -138,9 +160,14 @@ public class MediaControlsPlugin extends Plugin {
         super.load();
         requestNotifPermission();
 
+        // Initial setup - will be re-done in handleOnStart if bridge not ready
         try {
-            webView = getBridge().getWebView();
-            webView.addJavascriptInterface(new MediaJSBridge(), "MediaBridge");
+            if (getBridge() != null) {
+                webView = getBridge().getWebView();
+                if (webView != null) {
+                    webView.addJavascriptInterface(new MediaJSBridge(), "MediaBridge");
+                }
+            }
         } catch (Exception ignored) {}
 
         IntentFilter filter = new IntentFilter();

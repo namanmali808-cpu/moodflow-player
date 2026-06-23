@@ -1,6 +1,6 @@
 {
-  "versionCode": 12,
-  "versionName": "1.1.1",
-  "apkUrl": "https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.1.1/app-debug.apk",
-  "releaseNotes": "Fixed update button: auto-download without opening link. Background playback + lock screen + notification."
+  "versionCode": 13,
+  "versionName": "1.1.2",
+  "apkUrl": "https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.1.2/app-debug.apk",
+  "releaseNotes": "Fixed update button: downloads APK directly without opening browser. Bridge injected in handleOnStart. Fallback uses fetch+blob."
 }
