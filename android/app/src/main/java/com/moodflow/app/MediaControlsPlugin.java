@@ -59,6 +59,59 @@ public class MediaControlsPlugin extends Plugin {
             intent.setAction("STOP");
             getContext().startService(intent);
         }
+        @JavascriptInterface
+        public void downloadApk(final String url) {
+            if (url == null || url.isEmpty()) return;
+            final Context ctx = getContext();
+            final String fileName = "MoodFlow-" + System.currentTimeMillis() + ".apk";
+            final android.app.DownloadManager dm = (android.app.DownloadManager) ctx.getSystemService(Context.DOWNLOAD_SERVICE);
+            android.app.DownloadManager.Request req = new android.app.DownloadManager.Request(android.net.Uri.parse(url));
+            req.setTitle("MoodFlow Update");
+            req.setDescription("Downloading update...");
+            req.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            req.setMimeType("application/vnd.android.package-archive");
+            if (Build.VERSION.SDK_INT >= 29) {
+                req.setDestinationInExternalFilesDir(ctx, null, fileName);
+            } else {
+                req.setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, fileName);
+            }
+            final long downloadId = dm.enqueue(req);
+            ctx.registerReceiver(new android.content.BroadcastReceiver() {
+                @Override
+                public void onReceive(android.content.Context context, android.content.Intent intent) {
+                    long id = intent.getLongExtra(android.app.DownloadManager.EXTRA_DOWNLOAD_ID, -1);
+                    if (id == downloadId) {
+                        try {
+                            android.app.DownloadManager.Query q = new android.app.DownloadManager.Query();
+                            q.setFilterById(downloadId);
+                            android.database.Cursor c = dm.query(q);
+                            if (c != null && c.moveToFirst()) {
+                                int status = c.getInt(c.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_STATUS));
+                                if (status == android.app.DownloadManager.STATUS_SUCCESSFUL) {
+                                    String uriStr = c.getString(c.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_LOCAL_URI));
+                                    c.close();
+                                    android.net.Uri fileUri = android.net.Uri.parse(uriStr);
+                                    android.content.Intent install = new android.content.Intent(android.content.Intent.ACTION_VIEW);
+                                    if (Build.VERSION.SDK_INT >= 24) {
+                                        java.io.File f = new java.io.File(fileUri.getPath());
+                                        android.net.Uri contentUri = androidx.core.content.FileProvider.getUriForFile(ctx, "com.moodflow.app.fileprovider", f);
+                                        install.setDataAndType(contentUri, "application/vnd.android.package-archive");
+                                        install.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                                    } else {
+                                        install.setDataAndType(fileUri, "application/vnd.android.package-archive");
+                                    }
+                                    install.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                                    ctx.startActivity(install);
+                                } else {
+                                    if (c != null) c.close();
+                                }
+                            }
+                        } catch (Exception ignored) {}
+                        try { context.unregisterReceiver(this); } catch (Exception ignored) {}
+                    }
+                }
+            }, new android.content.IntentFilter(android.app.DownloadManager.ACTION_DOWNLOAD_COMPLETE));
+        }
     }
 
     private void startService(Context ctx, Intent intent) {

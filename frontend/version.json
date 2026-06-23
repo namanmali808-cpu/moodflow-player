@@ -1,6 +1,6 @@
 {
-  "versionCode": 9,
-  "versionName": "1.0.8",
-  "apkUrl": "https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.0.8/app-debug.apk",
-  "releaseNotes": "Lock screen controls + notification + background playback fixed. Direct JavaScriptInterface bridge."
+  "versionCode": 10,
+  "versionName": "1.0.9",
+  "apkUrl": "https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.0.9/app-debug.apk",
+  "releaseNotes": "Fixed auto-download + install. Direct JS bridge for reliable lock screen, notification, background playback, and updates."
 }

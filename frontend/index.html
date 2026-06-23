@@ -1371,7 +1371,7 @@ function signOut() {
   if(currentUser && confirm('Sign out?')) { clearPremCache(); firebaseAuth.signOut(); }
 }
 
-var APP_VERSION = 9;
+var APP_VERSION = 10;
 var updateInfo = null;
 
 function checkUpdate() {
@@ -1394,7 +1394,11 @@ function doUpdate() {
   if(!updateInfo || !updateInfo.apkUrl) return;
   id('updateBtn').disabled = true;
   id('updateBtn').textContent = '⏳ Downloading...';
-  try {
+  if(window.MediaBridge) {
+    window.MediaBridge.downloadApk(updateInfo.apkUrl);
+    id('updateBtn').textContent = '⬇ Download started... Check notification';
+    setTimeout(function(){ id('updateBtn').disabled = false; }, 3000);
+  } else try {
     var AppUpdate = Capacitor.Plugins.AppUpdate;
     AppUpdate.downloadAndInstall({ url: updateInfo.apkUrl }).then(function() {
       id('updateBtn').textContent = '✅ Done! Install now.';
@@ -1405,11 +1409,11 @@ function doUpdate() {
       txt('status', 'Update failed: ' + e.message);
     });
   } catch(e) {
-    id('updateBtn').textContent = '⬇ Download APK';
+    id('updateBtn').textContent = '⬇ Open Link';
     id('updateBtn').disabled = false;
     var a = document.createElement('a');
     a.href = updateInfo.apkUrl;
-    a.download = 'MoodFlow.apk';
+    a.target = '_blank';
     a.click();
   }
 }
