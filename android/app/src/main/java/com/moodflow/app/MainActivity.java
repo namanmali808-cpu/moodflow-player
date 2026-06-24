@@ -15,6 +15,7 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
 
     private ActivityResultLauncher<String> notifPermissionLauncher;
+    private int bridgeInjectAttempts = 0;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -22,23 +23,30 @@ public class MainActivity extends BridgeActivity {
 
         notifPermissionLauncher = registerForActivityResult(
             new ActivityResultContracts.RequestPermission(),
-            result -> {
-                // Permission granted or denied - either way, bridge initialization continues
-            }
+            result -> {}
         );
 
         registerPlugin(AppUpdatePlugin.class);
         registerPlugin(MediaControlsPlugin.class);
 
-        getBridge().getWebView().post(() -> {
-            try {
-                WebView wv = getBridge().getWebView();
-                wv.addJavascriptInterface(new MediaBridge(MainActivity.this, wv), "MediaBridge");
-            } catch (Exception ignored) {}
-        });
+        injectBridge();
 
-        // Request notification permission for Android 13+
         requestNotifPermission();
+    }
+
+    private void injectBridge() {
+        try {
+            WebView wv = getBridge().getWebView();
+            if (wv != null) {
+                wv.addJavascriptInterface(new MediaBridge(MainActivity.this, wv), "MediaBridge");
+                return;
+            }
+        } catch (Exception ignored) {}
+        // Retry if WebView not ready
+        if (bridgeInjectAttempts < 10) {
+            bridgeInjectAttempts++;
+            getWindow().getDecorView().postDelayed(this::injectBridge, 500);
+        }
     }
 
     private void requestNotifPermission() {
