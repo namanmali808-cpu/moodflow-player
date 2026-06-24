@@ -34,6 +34,23 @@ public class MainActivity extends BridgeActivity {
         requestNotifPermission();
     }
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // Immediately resume WebView to keep YouTube iframe alive in background
+        try {
+            WebView wv = getBridge().getWebView();
+            if (wv != null) {
+                wv.postDelayed(() -> {
+                    try {
+                        wv.onResume();
+                        wv.resumeTimers();
+                    } catch (Exception ignored) {}
+                }, 100);
+            }
+        } catch (Exception ignored) {}
+    }
+
     private void injectBridge() {
         try {
             WebView wv = getBridge().getWebView();
