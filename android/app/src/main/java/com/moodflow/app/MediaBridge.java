@@ -150,11 +150,18 @@ public class MediaBridge {
                 }
                 final String finalUrl = audioUrl;
                 if (!finalUrl.isEmpty()) {
-                    Intent intent = new Intent(ctx, MediaPlaybackService.class);
-                    intent.setAction(MediaPlaybackService.ACTION_PLAY_AUDIO);
-                    intent.putExtra(MediaPlaybackService.EXTRA_AUDIO_URL, finalUrl);
-                    intent.putExtra(MediaPlaybackService.EXTRA_VIDEO_ID, videoId);
-                    startService(intent);
+                    // Ensure service is running (sendBroadcast goes to registered BroadcastReceiver in service)
+                    Intent startIntent = new Intent(ctx, MediaPlaybackService.class);
+                    startIntent.setAction("UPDATE_META");
+                    startIntent.putExtra("videoId", videoId);
+                    startIntent.putExtra("playing", true);
+                    startService(startIntent);
+                    // Send broadcast with audio URL to service's BroadcastReceiver
+                    Intent playIntent = new Intent(MediaPlaybackService.ACTION_PLAY_AUDIO);
+                    playIntent.setPackage(ctx.getPackageName());
+                    playIntent.putExtra(MediaPlaybackService.EXTRA_AUDIO_URL, finalUrl);
+                    playIntent.putExtra(MediaPlaybackService.EXTRA_VIDEO_ID, videoId);
+                    ctx.sendBroadcast(playIntent);
                 }
             } catch (Exception ignored) {}
         }).start();
