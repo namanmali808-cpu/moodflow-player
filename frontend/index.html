@@ -552,7 +552,7 @@ function playSong(i) {
   if(window.MediaBridge) {
     paused = false; playing = true; txt('playBtn','||');
   }
-  player.mute();
+  if(!window.MediaBridge) player.mute();
   player.loadVideoById({videoId: s.id, startSeconds: hookStart ? HOOK_SECONDS : 0});
   txt('playBtn', '||');
   updateMediaSession(s);
