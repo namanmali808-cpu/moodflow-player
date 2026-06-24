@@ -17,6 +17,7 @@ import android.media.session.PlaybackState;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManager;
+import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
 
@@ -81,11 +82,6 @@ public class MediaPlaybackService extends Service {
                 .build());
         mediaPlayer.setOnCompletionListener(mp -> {
             sendBroadcast(new Intent("com.moodflow.app.media.SONG_ENDED").setPackage(getPackageName()));
-            updateNotification();
-        });
-        mediaPlayer.setOnErrorListener((mp, what, extra) -> {
-            sendBroadcast(new Intent("com.moodflow.app.media.SONG_ERROR").setPackage(getPackageName()));
-            return true;
         });
 
         IntentFilter filter = new IntentFilter();
@@ -99,7 +95,11 @@ public class MediaPlaybackService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) flags = Context.RECEIVER_NOT_EXPORTED;
         registerReceiver(actionReceiver, filter, flags);
 
-        startForeground(NOTIF_ID, buildNotification());
+        try {
+            startForeground(NOTIF_ID, buildNotification());
+        } catch (Exception e) {
+            Log.e("MoodFlow", "startForeground failed", e);
+        }
     }
 
     private final BroadcastReceiver actionReceiver = new BroadcastReceiver() {
@@ -107,13 +107,13 @@ public class MediaPlaybackService extends Service {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             if (ACTION_PLAY.equals(action)) {
-                if (mediaPlayer != null && !mediaPlayer.isPlaying()) {
+                if (mediaPlayer != null) {
                     mediaPlayer.start();
                     isPlaying = true;
                     updateNotification();
                 }
             } else if (ACTION_PAUSE.equals(action)) {
-                if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+                if (mediaPlayer != null) {
                     mediaPlayer.pause();
                     isPlaying = false;
                     updateNotification();
@@ -139,8 +139,12 @@ public class MediaPlaybackService extends Service {
             stopAudio();
             currentVideoId = videoId != null ? videoId : "";
             mediaPlayer.reset();
-            mediaPlayer.setDataSource(url);
-            mediaPlayer.prepareAsync();
+            mediaPlayer.setOnErrorListener((mp, what, extra) -> {
+                Log.e("MoodFlow", "MediaPlayer error: what=" + what + " extra=" + extra);
+                sendBroadcast(new Intent("com.moodflow.app.media.AUDIO_ERROR")
+                        .setPackage(getPackageName()));
+                return true;
+            });
             mediaPlayer.setOnPreparedListener(mp -> {
                 mediaPlayer.start();
                 isPlaying = true;
@@ -149,7 +153,10 @@ public class MediaPlaybackService extends Service {
                 sendBroadcast(new Intent("com.moodflow.app.media.AUDIO_STARTED")
                         .setPackage(getPackageName()));
             });
+            mediaPlayer.setDataSource(url);
+            mediaPlayer.prepareAsync();
         } catch (IOException | IllegalStateException e) {
+            Log.e("MoodFlow", "playAudioUrl failed", e);
             sendBroadcast(new Intent("com.moodflow.app.media.AUDIO_ERROR")
                     .setPackage(getPackageName()));
         }
@@ -161,17 +168,19 @@ public class MediaPlaybackService extends Service {
                 mediaPlayer.stop();
                 mediaPlayer.reset();
             } catch (Exception ignored) {}
-            isPlaying = false;
-            updateNotification();
         }
+        isPlaying = false;
+        updateNotification();
     }
 
     private void updateMetadata() {
-        mediaSession.setMetadata(new MediaMetadata.Builder()
-                .putString(MediaMetadata.METADATA_KEY_TITLE, currentTitle)
-                .putString(MediaMetadata.METADATA_KEY_ARTIST, currentArtist)
-                .putString(MediaMetadata.METADATA_KEY_MEDIA_ID, currentVideoId)
-                .build());
+        try {
+            mediaSession.setMetadata(new MediaMetadata.Builder()
+                    .putString(MediaMetadata.METADATA_KEY_TITLE, currentTitle)
+                    .putString(MediaMetadata.METADATA_KEY_ARTIST, currentArtist)
+                    .putString(MediaMetadata.METADATA_KEY_MEDIA_ID, currentVideoId)
+                    .build());
+        } catch (Exception ignored) {}
     }
 
     private Notification buildNotification() {
@@ -181,7 +190,7 @@ public class MediaPlaybackService extends Service {
 
         int playIcon = isPlaying ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play;
 
-        return new NotificationCompat.Builder(this, CHANNEL_ID)
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_media_play)
                 .setContentTitle(currentTitle)
                 .setContentText(currentArtist)
@@ -193,21 +202,30 @@ public class MediaPlaybackService extends Service {
                 .addAction(playIcon, isPlaying ? "Pause" : "Play", pendingBroadcast(isPlaying ? ACTION_PAUSE : ACTION_PLAY))
                 .addAction(0, "Next", pendingBroadcast(ACTION_NEXT))
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setSilent(true)
-                .build();
+                .setSilent(true);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            builder.setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE);
+        }
+
+        return builder.build();
     }
 
     private void updateNotification() {
-        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        nm.notify(NOTIF_ID, buildNotification());
+        try {
+            NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            nm.notify(NOTIF_ID, buildNotification());
+        } catch (Exception ignored) {}
 
-        int state = isPlaying ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED;
-        mediaSession.setPlaybackState(new PlaybackState.Builder()
-                .setState(state, PlaybackState.PLAYBACK_POSITION_UNKNOWN, 1.0f)
-                .setActions(PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE |
-                        PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS |
-                        PlaybackState.ACTION_STOP)
-                .build());
+        try {
+            int state = isPlaying ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED;
+            mediaSession.setPlaybackState(new PlaybackState.Builder()
+                    .setState(state, PlaybackState.PLAYBACK_POSITION_UNKNOWN, 1.0f)
+                    .setActions(PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE |
+                            PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS |
+                            PlaybackState.ACTION_STOP)
+                    .build());
+        } catch (Exception ignored) {}
     }
 
     private PendingIntent pendingBroadcast(String action) {
@@ -249,7 +267,7 @@ public class MediaPlaybackService extends Service {
         mediaSession.setActive(false);
         mediaSession.release();
         try { unregisterReceiver(actionReceiver); } catch (Exception ignored) {}
-        stopForeground(true);
+        try { stopForeground(true); } catch (Exception ignored) {}
         super.onDestroy();
     }
 }
