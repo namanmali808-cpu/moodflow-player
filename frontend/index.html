@@ -561,6 +561,14 @@ function playSong(i) {
   if(window.MediaBridge) {
     window.MediaBridge.updateMediaWithVid(s.title || s.id, 'Mood Player', s.id, true);
     window.MediaBridge.playNativeAudio(s.id);
+    // Fallback: if native audio doesn't start within 5s, unmute YouTube player
+    if(window._nativeFallbackTimer) clearTimeout(window._nativeFallbackTimer);
+    window._nativeFallbackTimer = setTimeout(function(){
+      if(!window._nativeAudioStarted && player) {
+        player.unMute();
+        player.setVolume((id('volSlider') || {}).value || 80);
+      }
+    }, 5000);
   }
   renderQueue();
   updateFavBtn(s.id);
@@ -599,6 +607,7 @@ function doPlay() {
 
 function sk() {
   if(!ytReady || !player || !queue.length) return;
+  window._nativeAudioStarted = false;
   stopNativeAudio();
   var c = document.querySelector('.container');
   if(c) { c.classList.remove('swipeL','swipeR'); void c.offsetWidth; c.classList.add('swipeL'); }
@@ -608,6 +617,7 @@ function sk() {
 }
 function prv() {
   if(!ytReady || !player || !queue.length) return;
+  window._nativeAudioStarted = false;
   stopNativeAudio();
   var c = document.querySelector('.container');
   if(c) { c.classList.remove('swipeL','swipeR'); void c.offsetWidth; c.classList.add('swipeR'); }
@@ -618,6 +628,7 @@ function prv() {
 
 function stp() {
   if(!ytReady || !player) return;
+  window._nativeAudioStarted = false;
   stopNativeAudio();
   player.stopVideo();
   txt('playBtn', 'Play');
@@ -652,6 +663,8 @@ function mediaOnPrev() { if(window.prv) prv(); }
 // Native Android MediaPlayer playback (foreground service, survives lock/minimize)
 function onNativeAudioStart() {
   // Service has started playing native audio - update UI
+  window._nativeAudioStarted = true;
+  if(window._nativeFallbackTimer) { clearTimeout(window._nativeFallbackTimer); window._nativeFallbackTimer = null; }
   playing = true; paused = false; txt('playBtn','||');
   if(raf) clearTimeout(raf);
   raf = setTimeout(tick, 2000);
