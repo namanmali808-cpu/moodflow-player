@@ -1460,32 +1460,34 @@ function checkUpdate() {
 function doUpdate() {
   if(!updateInfo || !updateInfo.apkUrl) return;
   id('updateBtn').disabled = true;
-  id('updateBtn').textContent = '⏳ Opening...';
+  id('updateBtn').textContent = '⏳ Downloading...';
   var apkUrl = updateInfo.apkUrl;
-  // Method 1: Web Share API - opens system share sheet, user can share to Chrome
-  if(navigator.share) {
-    navigator.share({ title: 'MoodFlow Update', url: apkUrl }).then(function(){
-      id('updateBtn').textContent = '✅ Open in browser';
-    }).catch(function(){
-      fallbackDownload(apkUrl);
-    });
-  } else {
-    fallbackDownload(apkUrl);
-  }
-  id('updateBtn').disabled = false;
-}
-function fallbackDownload(url) {
-  // Navigate directly to APK URL (triggers Android download dialog)
-  var a = document.createElement('a');
-  a.href = url;
-  a.download = 'MoodFlow.apk';
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  try { a.click(); } catch(e) {}
-  setTimeout(function(){ try { document.body.removeChild(a); } catch(e){} }, 2000);
-  id('updateBtn').textContent = '⬇ Check notifications';
-  id('updateNotes').innerHTML = 'If nothing happens, open in browser:<br>' +
-    '<a href="' + url + '" target="_blank" style="color:#818cf8;font-size:16px">📥 Download APK v' + updateInfo.versionName + '</a>';
+  // Try to fetch APK from same origin (Firebase hosting) - no CORS issues
+  var localUrl = '/app-debug.apk';
+  fetch(localUrl).then(function(r) {
+    if(!r.ok) throw new Error('Not found');
+    return r.blob();
+  }).then(function(blob) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'MoodFlow.apk';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function() {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    }, 2000);
+    id('updateBtn').textContent = '✅ Downloaded! Open file to install.';
+    id('updateBtn').disabled = false;
+  }).catch(function() {
+    // Fallback: try same-origin navigation
+    window.location.href = localUrl;
+    setTimeout(function(){
+      id('updateBtn').textContent = '⬇ Check notifications';
+      id('updateBtn').disabled = false;
+      id('updateNotes').innerHTML = '<a href="' + localUrl + '" style="color:#818cf8;font-size:16px">📥 Tap to download APK</a>';
+    }, 2000);
+  });
 }
 function downloadFallback(url) {
   id('updateBtn').textContent = '⏳ Downloading...';
