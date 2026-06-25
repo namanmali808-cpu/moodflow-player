@@ -551,9 +551,12 @@ function playSong(i) {
   triggerBurst();
   if(window.MediaBridge) {
     paused = false; playing = true; txt('playBtn','||');
+    player.mute();
+    player.cueVideoById({videoId: s.id, startSeconds: hookStart ? HOOK_SECONDS : 0});
+  } else {
+    player.mute();
+    player.loadVideoById({videoId: s.id, startSeconds: hookStart ? HOOK_SECONDS : 0});
   }
-  if(!window.MediaBridge) player.mute();
-  player.loadVideoById({videoId: s.id, startSeconds: hookStart ? HOOK_SECONDS : 0});
   txt('playBtn', '||');
   updateMediaSession(s);
 
@@ -561,10 +564,11 @@ function playSong(i) {
   if(window.MediaBridge) {
     window.MediaBridge.updateMediaWithVid(s.title || s.id, 'Mood Player', s.id, true);
     window.MediaBridge.playNativeAudio(s.id);
-    // Fallback: if native audio doesn't start within 5s, unmute YouTube player
+    // Fallback: if native audio doesn't start within 5s, load and unmute YouTube
     if(window._nativeFallbackTimer) clearTimeout(window._nativeFallbackTimer);
     window._nativeFallbackTimer = setTimeout(function(){
       if(!window._nativeAudioStarted && player) {
+        player.loadVideoById({videoId: s.id, startSeconds: hookStart ? HOOK_SECONDS : 0});
         player.unMute();
         player.setVolume((id('volSlider') || {}).value || 80);
       }
@@ -589,9 +593,7 @@ function doPlay() {
   }
   if(queueIndex >= 0 && queue.length > 0) {
     if(window.MediaBridge) {
-      var s = queue[queueIndex];
-      window.MediaBridge.updateMediaWithVid(s.title || s.id, 'Mood Player', s.id, true);
-      window.MediaBridge.playNativeAudio(s.id);
+      window.MediaBridge.play();
     } else { player.playVideo(); player.setVolume((id('volSlider') || {}).value || 80); player.unMute(); }
     return;
   }
@@ -912,6 +914,7 @@ function onYouTubeIframeAPIReady() {
               if(queueIndex + 1 < queue.length) playSong(queueIndex + 1);
               else { queue = freshQueue(); playSong(0); }
             } else if(e.data === YT.PlayerState.BUFFERING) {
+              if(window.MediaBridge) return;
               txt('status', 'Loading...');
               if(buffTimer) clearTimeout(buffTimer);
               buffTimer = setTimeout(buffTimeout, 8000);
