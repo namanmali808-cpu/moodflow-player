@@ -16,11 +16,6 @@ import android.os.IBinder;
 import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
-import androidx.media3.common.MediaItem;
-import androidx.media3.common.Player;
-import androidx.media3.exoplayer.ExoPlayer;
-
-import java.io.IOException;
 
 public class MediaPlaybackService extends Service {
 
@@ -30,15 +25,8 @@ public class MediaPlaybackService extends Service {
     public static final String ACTION_PAUSE = "com.moodflow.app.media.PAUSE";
     public static final String ACTION_NEXT = "com.moodflow.app.media.NEXT";
     public static final String ACTION_PREV = "com.moodflow.app.media.PREV";
-    public static final String ACTION_PLAY_AUDIO = "com.moodflow.app.media.PLAY_AUDIO";
-    public static final String ACTION_STOP_AUDIO = "com.moodflow.app.media.STOP_AUDIO";
-    public static final String EXTRA_AUDIO_URL = "audioUrl";
-    public static final String EXTRA_VIDEO_ID = "videoId";
-
-    public static boolean nativeAudioActive = false;
 
     private MediaSession mediaSession;
-    private ExoPlayer exoPlayer;
     private String currentTitle = "MoodFlow";
     private String currentArtist = "";
     private boolean isPlaying = false;
@@ -73,29 +61,13 @@ public class MediaPlaybackService extends Service {
             public void onStop() { stopSelf(); }
         });
         mediaSession.setActive(true);
-
-        exoPlayer = new ExoPlayer.Builder(this).build();
-        exoPlayer.addListener(new Player.Listener() {
-            @Override
-            public void onPlaybackStateChanged(int playbackState) {
-                if (playbackState == Player.STATE_ENDED) {
-                    sendBroadcast(new Intent("com.moodflow.app.media.SONG_ENDED").setPackage(getPackageName()));
-                }
-            }
-            @Override
-            public void onIsPlayingChanged(boolean playing) {
-                isPlaying = playing;
-                updateNotification();
-            }
-        });
+        updatePlaybackState();
 
         IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_PLAY);
         filter.addAction(ACTION_PAUSE);
         filter.addAction(ACTION_NEXT);
         filter.addAction(ACTION_PREV);
-        filter.addAction(ACTION_PLAY_AUDIO);
-        filter.addAction(ACTION_STOP_AUDIO);
         int flags = 0;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) flags = Context.RECEIVER_NOT_EXPORTED;
         registerReceiver(actionReceiver, filter, flags);
@@ -112,25 +84,13 @@ public class MediaPlaybackService extends Service {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             if (ACTION_PLAY.equals(action)) {
-                if (exoPlayer != null) {
-                    exoPlayer.setPlayWhenReady(true);
-                    isPlaying = true;
-                    updateNotification();
-                }
+                isPlaying = true;
+                updatePlaybackState();
+                updateNotification();
             } else if (ACTION_PAUSE.equals(action)) {
-                if (exoPlayer != null) {
-                    exoPlayer.setPlayWhenReady(false);
-                    isPlaying = false;
-                    updateNotification();
-                }
-            } else if (ACTION_PLAY_AUDIO.equals(action)) {
-                String url = intent.getStringExtra(EXTRA_AUDIO_URL);
-                String vid = intent.getStringExtra(EXTRA_VIDEO_ID);
-                if (url != null && !url.isEmpty()) {
-                    playAudioUrl(url, vid);
-                }
-            } else if (ACTION_STOP_AUDIO.equals(action)) {
-                stopAudio();
+                isPlaying = false;
+                updatePlaybackState();
+                updateNotification();
             } else if (ACTION_NEXT.equals(action)) {
                 sendBroadcast(new Intent("com.moodflow.app.media.NEXT_SONG").setPackage(getPackageName()));
             } else if (ACTION_PREV.equals(action)) {
@@ -138,54 +98,6 @@ public class MediaPlaybackService extends Service {
             }
         }
     };
-
-    private void playAudioUrl(String url, String videoId) {
-        try {
-            stopAudio();
-            currentVideoId = videoId != null ? videoId : "";
-            MediaItem mediaItem = MediaItem.fromUri(url);
-            exoPlayer.setMediaItem(mediaItem);
-            exoPlayer.prepare();
-            exoPlayer.setPlayWhenReady(true);
-            isPlaying = true;
-            nativeAudioActive = true;
-            updateMetadata();
-            updateNotification();
-            sendBroadcast(new Intent("com.moodflow.app.media.AUDIO_STARTED")
-                    .setPackage(getPackageName()));
-        } catch (Exception e) {
-            Log.e("MoodFlow", "playAudioUrl failed", e);
-            sendBroadcast(new Intent("com.moodflow.app.media.AUDIO_ERROR")
-                    .setPackage(getPackageName()));
-        }
-    }
-
-    private void stopAudio() {
-        if (exoPlayer != null) {
-            try {
-                exoPlayer.stop();
-            } catch (Exception ignored) {}
-        }
-        isPlaying = false;
-        nativeAudioActive = false;
-        updateNotification();
-    }
-
-    private void updateMetadata() {
-        try {
-            androidx.media3.common.MediaMetadata.Builder metaBuilder =
-                new androidx.media3.common.MediaMetadata.Builder()
-                    .setTitle(currentTitle)
-                    .setArtist(currentArtist);
-            mediaSession.setMetadata(
-                new android.media.MediaMetadata.Builder()
-                    .putString(android.media.MediaMetadata.METADATA_KEY_TITLE, currentTitle)
-                    .putString(android.media.MediaMetadata.METADATA_KEY_ARTIST, currentArtist)
-                    .putString(android.media.MediaMetadata.METADATA_KEY_MEDIA_ID, currentVideoId)
-                    .build()
-            );
-        } catch (Exception ignored) {}
-    }
 
     private Notification buildNotification() {
         Intent launchIntent = getPackageManager().getLaunchIntentForPackage(getPackageName());
@@ -220,7 +132,9 @@ public class MediaPlaybackService extends Service {
             NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
             nm.notify(NOTIF_ID, buildNotification());
         } catch (Exception ignored) {}
+    }
 
+    private void updatePlaybackState() {
         try {
             int state = isPlaying ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED;
             mediaSession.setPlaybackState(new PlaybackState.Builder()
@@ -243,16 +157,27 @@ public class MediaPlaybackService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null) {
             String action = intent.getAction();
-            if ("UPDATE_META".equals(action)) {
+            if ("START".equals(action)) {
+                // Service is already running via startForeground, just update
+                try {
+                    startForeground(NOTIF_ID, buildNotification());
+                } catch (Exception ignored) {}
+            } else if ("UPDATE_META".equals(action)) {
                 if (intent.hasExtra("title")) currentTitle = intent.getStringExtra("title");
                 if (intent.hasExtra("artist")) currentArtist = intent.getStringExtra("artist");
                 if (intent.hasExtra("videoId")) currentVideoId = intent.getStringExtra("videoId");
                 if (intent.hasExtra("playing")) isPlaying = intent.getBooleanExtra("playing", false);
-                updateMetadata();
+                mediaSession.setMetadata(
+                    new android.media.MediaMetadata.Builder()
+                        .putString(android.media.MediaMetadata.METADATA_KEY_TITLE, currentTitle)
+                        .putString(android.media.MediaMetadata.METADATA_KEY_ARTIST, currentArtist)
+                        .putString(android.media.MediaMetadata.METADATA_KEY_MEDIA_ID, currentVideoId)
+                        .build()
+                );
+                updatePlaybackState();
                 updateNotification();
             }
             if ("STOP".equals(action)) {
-                stopAudio();
                 stopSelf();
             }
         }
@@ -264,10 +189,6 @@ public class MediaPlaybackService extends Service {
 
     @Override
     public void onDestroy() {
-        if (exoPlayer != null) {
-            try { exoPlayer.release(); } catch (Exception ignored) {}
-            exoPlayer = null;
-        }
         mediaSession.setActive(false);
         mediaSession.release();
         try { unregisterReceiver(actionReceiver); } catch (Exception ignored) {}

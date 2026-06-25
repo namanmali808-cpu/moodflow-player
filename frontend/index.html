@@ -554,19 +554,7 @@ function playSong(i) {
   player.setVolume((id('volSlider') || {}).value || 80);
   txt('playBtn', '||');
   updateMediaSession(s);
-
-  // Try native audio for background playback
-  if(window.MediaBridge) {
-    window.MediaBridge.updateMediaWithVid(s.title || s.id, 'Mood Player', s.id, true);
-    window.MediaBridge.playNativeAudio(s.id);
-    // After 3s, if native audio is playing, mute YouTube to avoid double audio
-    if(window._nativeCheckTimer) clearTimeout(window._nativeCheckTimer);
-    window._nativeCheckTimer = setTimeout(function(){
-      if(window.MediaBridge && window.MediaBridge.isNativeAudioActive && window.MediaBridge.isNativeAudioActive()) {
-        player.mute();
-      }
-    }, 3000);
-  }
+  startBackgroundService();
   renderQueue();
   updateFavBtn(s.id);
   var favB = id('favBtn');
@@ -582,11 +570,13 @@ function doPlay() {
   if(!ytReady || !player) { txt('status', 'Loading...'); loadYT(); return; }
   if(playing) {
     player.pauseVideo();
+    txt('playBtn', 'Play');
     if(window.MediaBridge) { window.MediaBridge.pause(); }
     return;
   }
   if(queueIndex >= 0 && queue.length > 0) {
     player.playVideo();
+    txt('playBtn', '||');
     player.setVolume((id('volSlider') || {}).value || 80);
     player.unMute();
     if(window.MediaBridge) { window.MediaBridge.play(); }
@@ -604,7 +594,6 @@ function doPlay() {
 
 function sk() {
   if(!ytReady || !player || !queue.length) return;
-  stopNativeAudio();
   var c = document.querySelector('.container');
   if(c) { c.classList.remove('swipeL','swipeR'); void c.offsetWidth; c.classList.add('swipeL'); }
   if(queueIndex + 1 < queue.length) playSong(queueIndex + 1);
@@ -613,7 +602,6 @@ function sk() {
 }
 function prv() {
   if(!ytReady || !player || !queue.length) return;
-  stopNativeAudio();
   var c = document.querySelector('.container');
   if(c) { c.classList.remove('swipeL','swipeR'); void c.offsetWidth; c.classList.add('swipeR'); }
   if(queueIndex > 0) playSong(queueIndex - 1);
@@ -623,7 +611,7 @@ function prv() {
 
 function stp() {
   if(!ytReady || !player) return;
-  stopNativeAudio();
+  stopBackgroundService();
   player.stopVideo();
   txt('playBtn', 'Play');
   txt('status', 'Stopped');
@@ -633,8 +621,6 @@ function stp() {
   playing = false;
   if(raf) { clearTimeout(raf); raf = null; }
   try { navigator.mediaSession.playbackState = 'none'; } catch(ex) {}
-  nativeMedia('hideMedia', {});
-  if(window.MediaBridge) window.MediaBridge.hideMedia();
 }
 
 // Native media bridge: prefers direct JS interface, falls back to Capacitor plugin
@@ -655,15 +641,28 @@ function mediaOnPause() { if(!window.paused) { if(window.MediaBridge) { window.M
 function mediaOnNext() { if(window.sk) sk(); }
 function mediaOnPrev() { if(window.prv) prv(); }
 
-// Native Android foreground service playback (survives lock/minimize)
-function stopNativeAudio() {
-  try { if(window.MediaBridge) window.MediaBridge.hideMedia(); } catch(ex) {}
+// Background service keeps WebView alive for YouTube playback when minimized
+function startBackgroundService() {
+  if(window.MediaBridge) {
+    window.MediaBridge.startBgService();
+    window.MediaBridge.updateMediaWithVid(
+      (queue[queueIndex]||{}).title||'MoodFlow',
+      'Mood Player',
+      (queue[queueIndex]||{}).id||'',
+      true
+    );
+  }
+}
+function stopBackgroundService() {
+  if(window.MediaBridge) {
+    window.MediaBridge.hideMedia();
+  }
 }
 function updateMediaSession(song) {
   try {
     if(!song) {
       navigator.mediaSession.playbackState = 'none';
-      nativeMedia('hideMedia', {});
+      stopBackgroundService();
       return;
     }
     navigator.mediaSession.metadata = new MediaMetadata({
@@ -679,6 +678,9 @@ function updateMediaSession(song) {
       if(queueIndex > 0) playSong(queueIndex - 1); else if(queue.length) playSong(0);
     });
     nativeMedia('updateMedia', {title: song.title || song.id, artist: 'Mood Player', playing: true});
+    if(window.MediaBridge) {
+      window.MediaBridge.updateMediaWithVid(song.title || song.id, 'Mood Player', song.id, true);
+    }
   } catch(ex) {}
 }
 function setupNativeMediaListeners() {
@@ -877,6 +879,7 @@ function onYouTubeIframeAPIReady() {
               raf = setTimeout(tick, 2000);
             } else if(e.data === YT.PlayerState.PAUSED) {
               playing = false;
+              txt('playBtn', 'Play');
               try { navigator.mediaSession.playbackState = 'paused'; } catch(ex) {}
               nativeMedia('setPlaying', {playing: false});
               if(buffTimer) { clearTimeout(buffTimer); buffTimer = null; }
