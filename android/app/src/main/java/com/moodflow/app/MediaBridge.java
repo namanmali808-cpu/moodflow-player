@@ -3,7 +3,6 @@ package com.moodflow.app;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -49,27 +48,26 @@ public class MediaBridge {
             try {
                 NewPipe.init(new Downloader() {
                     @Override
-                    public Response execute(Request request) throws Exception {
-                        HttpURLConnection conn = (HttpURLConnection) new URL(request.url()).openConnection();
-                        conn.setRequestMethod(request.httpMethod());
-                        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36");
-                        for (java.util.Map.Entry<String, String> h : request.headers().entrySet()) {
-                            conn.setRequestProperty(h.getKey(), h.getValue());
-                        }
-                        conn.setConnectTimeout(10000);
-                        conn.setReadTimeout(10000);
-                        conn.setInstanceFollowRedirects(true);
-                        int code = conn.getResponseCode();
-                        InputStream is = code >= 400 ? conn.getErrorStream() : conn.getInputStream();
-                        String body = new BufferedReader(new InputStreamReader(is))
-                            .lines().collect(java.util.stream.Collectors.joining("\n"));
-                        java.util.Map<String, String> respHeaders = new java.util.HashMap<>();
-                        for (java.util.Map.Entry<String, java.util.List<String>> h : conn.getHeaderFields().entrySet()) {
-                            if (h.getKey() != null && !h.getValue().isEmpty()) {
-                                respHeaders.put(h.getKey(), h.getValue().get(0));
+                    public Response execute(final Request request) {
+                        try {
+                            HttpURLConnection conn = (HttpURLConnection) new URL(request.url()).openConnection();
+                            conn.setRequestMethod(request.httpMethod());
+                            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36");
+                            for (java.util.Map.Entry<String, String> h : request.headers().entrySet()) {
+                                conn.setRequestProperty(h.getKey(), h.getValue());
                             }
+                            conn.setConnectTimeout(10000);
+                            conn.setReadTimeout(10000);
+                            conn.setInstanceFollowRedirects(true);
+                            int code = conn.getResponseCode();
+                            InputStream is = code >= 400 ? conn.getErrorStream() : conn.getInputStream();
+                            String body = new BufferedReader(new InputStreamReader(is))
+                                .lines().collect(java.util.stream.Collectors.joining("\n"));
+                            java.util.Map<String, java.util.List<String>> respHeaders = conn.getHeaderFields();
+                            return new Response(code, body, request.url(), respHeaders);
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
                         }
-                        return new Response(code, body, request.url(), respHeaders);
                     }
                 });
                 newPipeInit = true;
@@ -232,7 +230,7 @@ public class MediaBridge {
         new Thread(() -> {
             try {
                 StreamingService service = NewPipe.getService(0);
-                StreamInfo info = StreamInfo.getInfo(service.getStreamLinkHandlerFactory().fromId(videoId));
+                StreamInfo info = StreamInfo.getInfo(service.getStreamLHFactory().fromId(videoId));
                 List<AudioStream> audioStreams = info.getAudioStreams();
                 String audioUrl = null;
                 int bestQuality = -1;
