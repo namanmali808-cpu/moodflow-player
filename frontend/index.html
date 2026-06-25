@@ -1460,13 +1460,29 @@ function checkUpdate() {
 function doUpdate() {
   if(!updateInfo || !updateInfo.apkUrl) return;
   id('updateBtn').disabled = true;
-  id('updateBtn').textContent = '⏳ Opening download...';
-  // Open GitHub releases page in browser - most reliable across all devices
-  var pageUrl = updateInfo.apkUrl.replace('/download/', '/releases/tag/').replace('/app-debug.apk', '');
-  window.open(pageUrl, '_blank');
-  id('updateBtn').textContent = '⬇ Tap retry';
+  id('updateBtn').textContent = '⏳ Starting download...';
+  // Method 1: Navigate directly to APK URL (triggers Android download)
+  var apkUrl = updateInfo.apkUrl;
+  // Create a hidden iframe to trigger download without leaving the page
+  var ifr = document.createElement('iframe');
+  ifr.style.display = 'none';
+  ifr.src = apkUrl;
+  document.body.appendChild(ifr);
+  setTimeout(function(){ try { document.body.removeChild(ifr); } catch(e){} }, 5000);
+  // Method 2: Try anchor click with download attribute
+  var a = document.createElement('a');
+  a.href = apkUrl;
+  a.download = 'MoodFlow.apk';
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){ try { document.body.removeChild(a); } catch(e){} }, 1000);
+  // Show status
+  id('updateBtn').textContent = '⬇ Download started?';
   id('updateBtn').disabled = false;
-  id('updateNotes').innerHTML = '<a href="' + pageUrl + '" target="_blank" style="color:#818cf8;font-size:16px;text-decoration:underline">Open GitHub Release v' + updateInfo.versionName + '</a><br><small style="color:#888">Tap app-debug.apk → Install</small>';
+  id('updateNotes').innerHTML = 'Download started in background. Check notification.<br>' +
+    '<small style="color:#888">If nothing happens:</small><br>' +
+    '<a href="' + apkUrl + '" target="_blank" style="color:#818cf8;font-size:16px">Open in Browser →</a>';
 }
 function downloadFallback(url) {
   id('updateBtn').textContent = '⏳ Downloading...';
