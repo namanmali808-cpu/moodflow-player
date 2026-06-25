@@ -5,6 +5,7 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.webkit.WebView;
+import android.webkit.WebSettings;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -36,12 +37,8 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onPause() {
-        // Don't call super.onPause() which pauses the WebView!
-        // This keeps YouTube iframe alive in background
         isPausing = true;
-        // Call only the Activity onPause, not BridgeActivity's (which pauses WebView)
         super.onPause();
-        // Immediately resume the WebView
         try {
             WebView wv = getBridge().getWebView();
             if (wv != null) {
@@ -61,6 +58,10 @@ public class MainActivity extends BridgeActivity {
         try {
             WebView wv = getBridge().getWebView();
             if (wv != null) {
+                WebSettings ws = wv.getSettings();
+                ws.setMediaPlaybackRequiresUserGesture(false);
+                ws.setJavaScriptEnabled(true);
+                ws.setDomStorageEnabled(true);
                 wv.addJavascriptInterface(new MediaBridge(MainActivity.this, wv), "MediaBridge");
                 return;
             }
