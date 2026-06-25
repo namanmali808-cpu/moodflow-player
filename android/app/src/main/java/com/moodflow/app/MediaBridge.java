@@ -6,6 +6,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -16,22 +17,27 @@ import android.webkit.WebView;
 import androidx.core.content.FileProvider;
 import androidx.core.app.NotificationCompat;
 
+import org.schabi.newpipe.extractor.NewPipe;
+import org.schabi.newpipe.extractor.StreamingService;
+import org.schabi.newpipe.extractor.downloader.Downloader;
+import org.schabi.newpipe.extractor.downloader.Request;
+import org.schabi.newpipe.extractor.downloader.Response;
+import org.schabi.newpipe.extractor.stream.AudioStream;
+import org.schabi.newpipe.extractor.stream.StreamInfo;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
+import java.util.List;
 
 public class MediaBridge {
 
     private static final String TAG = "MoodFlowBridge";
-    private static final String YT_API_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
+    private static boolean newPipeInit = false;
 
     private Context ctx;
     private WebView webView;
@@ -39,6 +45,47 @@ public class MediaBridge {
     public MediaBridge(Context context, WebView wv) {
         this.ctx = context;
         this.webView = wv;
+        if (!newPipeInit) {
+            try {
+                NewPipe.init(new Downloader() {
+                    @Override
+                    public Response execute(Request request) throws Exception {
+                        HttpURLConnection conn = (HttpURLConnection) new URL(request.url()).openConnection();
+                        conn.setRequestMethod(request.httpMethod());
+                        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36");
+                        for (java.util.Map.Entry<String, String> h : request.headers().entrySet()) {
+                            conn.setRequestProperty(h.getKey(), h.getValue());
+                        }
+                        conn.setConnectTimeout(10000);
+                        conn.setReadTimeout(10000);
+                        conn.setInstanceFollowRedirects(true);
+                        int code = conn.getResponseCode();
+                        InputStream is = code >= 400 ? conn.getErrorStream() : conn.getInputStream();
+                        String body = new BufferedReader(new InputStreamReader(is))
+                            .lines().collect(java.util.stream.Collectors.joining("\n"));
+                        java.util.Map<String, String> respHeaders = new java.util.HashMap<>();
+                        for (java.util.Map.Entry<String, java.util.List<String>> h : conn.getHeaderFields().entrySet()) {
+                            if (h.getKey() != null && !h.getValue().isEmpty()) {
+                                respHeaders.put(h.getKey(), h.getValue().get(0));
+                            }
+                        }
+                        return new Response(code, body, request.url(), respHeaders);
+                    }
+                });
+                newPipeInit = true;
+            } catch (Exception e) {
+                Log.e(TAG, "NewPipe init failed", e);
+            }
+        }
+    }
+
+    @JavascriptInterface
+    public int getVersionCode() {
+        try {
+            return ctx.getPackageManager().getPackageInfo(ctx.getPackageName(), 0).versionCode;
+        } catch (PackageManager.NameNotFoundException e) {
+            return 0;
+        }
     }
 
     @JavascriptInterface
@@ -46,7 +93,6 @@ public class MediaBridge {
         if (url == null || url.isEmpty()) return;
         new Thread(() -> {
             try {
-                // Download APK directly with HttpURLConnection (more reliable than DownloadManager)
                 HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
                 conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36");
                 conn.setInstanceFollowRedirects(true);
@@ -185,145 +231,39 @@ public class MediaBridge {
     public void playNativeAudio(final String videoId) {
         new Thread(() -> {
             try {
-                // Method 1: YouTube InnerTube API (most reliable)
-                String audioUrl = fetchFromInnerTube(videoId);
-                
-                // Method 2: Fallback to HTML parsing
-                if (audioUrl == null || audioUrl.isEmpty()) {
-                    Log.d(TAG, "InnerTube failed, trying HTML parsing for " + videoId);
-                    String html = fetchUrl("https://www.youtube.com/watch?v=" + videoId);
-                    audioUrl = extractAudioUrl(html);
+                StreamingService service = NewPipe.getService(0);
+                StreamInfo info = StreamInfo.getInfo(service.getStreamLinkHandlerFactory().fromId(videoId));
+                List<AudioStream> audioStreams = info.getAudioStreams();
+                String audioUrl = null;
+                int bestQuality = -1;
+                for (AudioStream as : audioStreams) {
+                    if (as.getAverageBitrate() > bestQuality) {
+                        bestQuality = as.getAverageBitrate();
+                        audioUrl = as.getUrl();
+                    }
                 }
-                
-                // Method 3: Fallback to get_video_info
-                if (audioUrl == null || audioUrl.isEmpty()) {
-                    Log.d(TAG, "HTML parsing failed, trying get_video_info for " + videoId);
-                    String info = fetchUrl("https://www.youtube.com/get_video_info?video_id=" + videoId);
-                    audioUrl = parseAudioUrlFromInfo(info);
+                if (audioUrl == null && info.getVideoStreams() != null && !info.getVideoStreams().isEmpty()) {
+                    audioUrl = info.getVideoStreams().get(0).getUrl();
                 }
-
                 if (audioUrl != null && !audioUrl.isEmpty()) {
-                    Log.d(TAG, "Found audio URL, sending to service for " + videoId);
-                    Intent startIntent = new Intent(ctx, MediaPlaybackService.class);
-                    startIntent.setAction("UPDATE_META");
-                    startIntent.putExtra("videoId", videoId);
-                    startIntent.putExtra("playing", true);
-                    startService(startIntent);
-
+                    Log.d(TAG, "NewPipe audio URL OK for " + videoId);
+                    Intent metaIntent = new Intent(ctx, MediaPlaybackService.class);
+                    metaIntent.setAction("UPDATE_META");
+                    metaIntent.putExtra("videoId", videoId);
+                    metaIntent.putExtra("playing", true);
+                    startService(metaIntent);
                     Intent playIntent = new Intent(MediaPlaybackService.ACTION_PLAY_AUDIO);
                     playIntent.setPackage(ctx.getPackageName());
                     playIntent.putExtra(MediaPlaybackService.EXTRA_AUDIO_URL, audioUrl);
                     playIntent.putExtra(MediaPlaybackService.EXTRA_VIDEO_ID, videoId);
                     ctx.sendBroadcast(playIntent);
                 } else {
-                    Log.e(TAG, "All methods failed to get audio URL for " + videoId);
+                    Log.e(TAG, "NewPipe: no audio URL for " + videoId);
                 }
             } catch (Exception e) {
                 Log.e(TAG, "playNativeAudio error for " + videoId, e);
             }
         }).start();
-    }
-
-    // YouTube InnerTube API - same API YouTube Android app uses
-    private String fetchFromInnerTube(String videoId) throws Exception {
-        URL url = new URL("https://www.youtube.com/youtubei/v1/player?key=" + YT_API_KEY);
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Content-Type", "application/json");
-        conn.setRequestProperty("User-Agent", "com.google.android.youtube/19.09.37 (Linux; U; Android 14)");
-        conn.setDoOutput(true);
-        conn.setConnectTimeout(10000);
-        conn.setReadTimeout(10000);
-
-        String body = "{\"videoId\":\"" + videoId + "\",\"context\":{\"client\":{\"clientName\":\"ANDROID\",\"clientVersion\":\"19.09.37\"}}}";
-        OutputStreamWriter writer = new OutputStreamWriter(conn.getOutputStream());
-        writer.write(body);
-        writer.flush();
-        writer.close();
-
-        int responseCode = conn.getResponseCode();
-        if (responseCode != 200) {
-            Log.e(TAG, "InnerTube returned " + responseCode);
-            return null;
-        }
-
-        String json = new BufferedReader(new InputStreamReader(conn.getInputStream()))
-                .lines().collect(Collectors.joining("\n"));
-
-        // Parse streamingData -> adaptiveFormats -> find audio/mp4 with highest bitrate
-        Pattern fmtP = Pattern.compile("\"adaptiveFormats\"\\s*:\\s*\\[(.+?)\\]", Pattern.DOTALL);
-        Matcher fmtM = fmtP.matcher(json);
-        if (!fmtM.find()) return null;
-
-        String formats = fmtM.group(1);
-        String[] parts = formats.split("\\},\\{");
-        String bestUrl = "";
-        int bestBitrate = -1;
-
-        for (String part : parts) {
-            boolean isAudio = part.contains("\"mimeType\"") && 
-                (part.contains("audio/mp4") || part.contains("audio/webm"));
-            if (!isAudio) continue;
-
-            Matcher brM = Pattern.compile("\"bitrate\"\\s*:\\s*(\\d+)").matcher(part);
-            int bitrate = 0;
-            if (brM.find()) bitrate = Integer.parseInt(brM.group(1));
-
-            Matcher urlM = Pattern.compile("\"url\"\\s*:\\s*\"([^\"]+)\"").matcher(part);
-            if (urlM.find() && bitrate > bestBitrate) {
-                bestBitrate = bitrate;
-                bestUrl = urlM.group(1).replace("\\u0026", "&").replace("\\/", "/");
-            }
-        }
-
-        return bestUrl.isEmpty() ? null : bestUrl;
-    }
-
-    private String fetchUrl(String urlStr) throws Exception {
-        URL url = new URL(urlStr);
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36");
-        conn.setRequestProperty("Accept-Language", "en-US,en;q=0.9");
-        conn.setConnectTimeout(10000);
-        conn.setReadTimeout(10000);
-        return new BufferedReader(new InputStreamReader(conn.getInputStream()))
-                .lines().collect(Collectors.joining("\n"));
-    }
-
-    private String extractAudioUrl(String html) {
-        Pattern p = Pattern.compile("ytInitialPlayerResponse\\s*=\\s*(\\{.+?\\});\\s*", Pattern.DOTALL);
-        Matcher m = p.matcher(html);
-        if (!m.find()) return null;
-        String json = m.group(1);
-        String[] parts = json.split("\"mimeType\"");
-        for (int i = 0; i < parts.length; i++) {
-            if ((parts[i].contains("audio/mp4") || parts[i].contains("audio/webm")) && parts[i].contains("\"url\"")) {
-                Matcher um = Pattern.compile("\"url\"\\s*:\\s*\"([^\"]+)\"").matcher(parts[i]);
-                if (um.find()) {
-                    return um.group(1).replace("\\u0026", "&").replace("\\/", "/");
-                }
-            }
-        }
-        Pattern ap = Pattern.compile("\"url\"\\s*:\\s*\"([^\"]+)\"");
-        Matcher am = ap.matcher(json);
-        if (am.find()) {
-            return am.group(1).replace("\\u0026", "&").replace("\\/", "/");
-        }
-        return null;
-    }
-
-    private String parseAudioUrlFromInfo(String info) {
-        try {
-            String[] params = java.net.URLDecoder.decode(info, "UTF-8").split("&");
-            for (String param : params) {
-                if (param.startsWith("player_response=")) {
-                    String prJson = param.substring("player_response=".length());
-                    String url = extractAudioUrl(prJson);
-                    if (url != null && !url.isEmpty()) return url;
-                }
-            }
-        } catch (Exception ignored) {}
-        return null;
     }
 
     private void startService(Intent intent) {
