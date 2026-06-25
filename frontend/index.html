@@ -1460,29 +1460,32 @@ function checkUpdate() {
 function doUpdate() {
   if(!updateInfo || !updateInfo.apkUrl) return;
   id('updateBtn').disabled = true;
-  id('updateBtn').textContent = '⏳ Starting download...';
-  // Method 1: Navigate directly to APK URL (triggers Android download)
+  id('updateBtn').textContent = '⏳ Opening...';
   var apkUrl = updateInfo.apkUrl;
-  // Create a hidden iframe to trigger download without leaving the page
-  var ifr = document.createElement('iframe');
-  ifr.style.display = 'none';
-  ifr.src = apkUrl;
-  document.body.appendChild(ifr);
-  setTimeout(function(){ try { document.body.removeChild(ifr); } catch(e){} }, 5000);
-  // Method 2: Try anchor click with download attribute
+  // Method 1: Web Share API - opens system share sheet, user can share to Chrome
+  if(navigator.share) {
+    navigator.share({ title: 'MoodFlow Update', url: apkUrl }).then(function(){
+      id('updateBtn').textContent = '✅ Open in browser';
+    }).catch(function(){
+      fallbackDownload(apkUrl);
+    });
+  } else {
+    fallbackDownload(apkUrl);
+  }
+  id('updateBtn').disabled = false;
+}
+function fallbackDownload(url) {
+  // Navigate directly to APK URL (triggers Android download dialog)
   var a = document.createElement('a');
-  a.href = apkUrl;
+  a.href = url;
   a.download = 'MoodFlow.apk';
   a.style.display = 'none';
   document.body.appendChild(a);
-  a.click();
-  setTimeout(function(){ try { document.body.removeChild(a); } catch(e){} }, 1000);
-  // Show status
-  id('updateBtn').textContent = '⬇ Download started?';
-  id('updateBtn').disabled = false;
-  id('updateNotes').innerHTML = 'Download started in background. Check notification.<br>' +
-    '<small style="color:#888">If nothing happens:</small><br>' +
-    '<a href="' + apkUrl + '" target="_blank" style="color:#818cf8;font-size:16px">Open in Browser →</a>';
+  try { a.click(); } catch(e) {}
+  setTimeout(function(){ try { document.body.removeChild(a); } catch(e){} }, 2000);
+  id('updateBtn').textContent = '⬇ Check notifications';
+  id('updateNotes').innerHTML = 'If nothing happens, open in browser:<br>' +
+    '<a href="' + url + '" target="_blank" style="color:#818cf8;font-size:16px">📥 Download APK v' + updateInfo.versionName + '</a>';
 }
 function downloadFallback(url) {
   id('updateBtn').textContent = '⏳ Downloading...';
