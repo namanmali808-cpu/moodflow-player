@@ -270,10 +270,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
   </div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+<script defer src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script>
 var RAZOR_KEY = 'rzp_test_T2I9lFcxVZWzRc';
 var HOOK_SECONDS = 20;
@@ -1194,18 +1194,37 @@ function startMic() {
 var firebaseAuth = null;
 var firestoreDb = null;
 
-try {
-  firebase.initializeApp({
-    apiKey: 'AIzaSyAFwUYmVsKE_SSxRBoGxsTFFXclJjSAfl0',
-    authDomain: 'yt-mood-player-naman.firebaseapp.com',
-    projectId: 'yt-mood-player-naman',
-    storageBucket: 'yt-mood-player-naman.firebasestorage.app',
-    messagingSenderId: '79051163289',
-    appId: '1:79051163289:web:b65c6b91495678da08'
-  });
-  firebaseAuth = firebase.auth();
-  firestoreDb = firebase.firestore();
-} catch(e) { txt('authNote', 'Firebase init error: ' + e.message); }
+document.addEventListener('DOMContentLoaded', function() {
+  try {
+    firebase.initializeApp({
+      apiKey: 'AIzaSyAFwUYmVsKE_SSxRBoGxsTFFXclJjSAfl0',
+      authDomain: 'yt-mood-player-naman.firebaseapp.com',
+      projectId: 'yt-mood-player-naman',
+      storageBucket: 'yt-mood-player-naman.firebasestorage.app',
+      messagingSenderId: '79051163289',
+      appId: '1:79051163289:web:b65c6b91495678da08'
+    });
+    firebaseAuth = firebase.auth();
+    firestoreDb = firebase.firestore();
+  } catch(e) { txt('authNote', 'Firebase init error: ' + e.message); }
+
+  if(firebaseAuth) {
+    firebaseAuth.onAuthStateChanged(function(user) {
+      try {
+        if(user) {
+          currentUser = user;
+          show('authScrn', 'none');
+          setPremium();
+          txt('status', user.email);
+          loadUserData(user.uid);
+          loadYT();
+        } else {
+          showAuth();
+        }
+      } catch(e) { txt('authNote', 'Auth state error: ' + e.message); }
+    });
+  }
+});
 
 function authToggle() {
   isSignUp = !isSignUp;
@@ -1370,23 +1389,6 @@ function updateMenuSub() {
     if(act) act.style.display = 'block';
     if(act) act.innerHTML = subLink('⭐ Subscribe Now — ₹41/mo', 'Unlock PRO features, new UI & colors:');
   }
-}
-
-if(firebaseAuth) {
-  firebaseAuth.onAuthStateChanged(function(user) {
-    try {
-      if(user) {
-        currentUser = user;
-        show('authScrn', 'none');
-        setPremium();
-        txt('status', user.email);
-        loadUserData(user.uid);
-        loadYT();
-      } else {
-        showAuth();
-      }
-    } catch(e) { txt('authNote', 'Auth state error: ' + e.message); }
-  });
 }
 
 setTimeout(function() {
