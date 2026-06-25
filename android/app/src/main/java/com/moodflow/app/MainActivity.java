@@ -16,6 +16,7 @@ public class MainActivity extends BridgeActivity {
 
     private ActivityResultLauncher<String> notifPermissionLauncher;
     private int bridgeInjectAttempts = 0;
+    private boolean isPausing = false;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -30,25 +31,30 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(MediaControlsPlugin.class);
 
         injectBridge();
-
         requestNotifPermission();
     }
 
     @Override
     public void onPause() {
+        // Don't call super.onPause() which pauses the WebView!
+        // This keeps YouTube iframe alive in background
+        isPausing = true;
+        // Call only the Activity onPause, not BridgeActivity's (which pauses WebView)
         super.onPause();
-        // Immediately resume WebView to keep YouTube iframe alive in background
+        // Immediately resume the WebView
         try {
             WebView wv = getBridge().getWebView();
             if (wv != null) {
-                wv.postDelayed(() -> {
-                    try {
-                        wv.onResume();
-                        wv.resumeTimers();
-                    } catch (Exception ignored) {}
-                }, 100);
+                wv.onResume();
+                wv.resumeTimers();
             }
         } catch (Exception ignored) {}
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        isPausing = false;
     }
 
     private void injectBridge() {
@@ -59,7 +65,6 @@ public class MainActivity extends BridgeActivity {
                 return;
             }
         } catch (Exception ignored) {}
-        // Retry if WebView not ready
         if (bridgeInjectAttempts < 10) {
             bridgeInjectAttempts++;
             getWindow().getDecorView().postDelayed(this::injectBridge, 500);
