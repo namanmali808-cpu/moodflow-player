@@ -185,9 +185,12 @@ public class MediaBridge {
     }
 
     @JavascriptInterface
-    public void startBgService() {
+    public void startBgService(String videoId) {
         Intent intent = new Intent(ctx, MediaPlaybackService.class);
         intent.setAction("START");
+        if (videoId != null && !videoId.isEmpty()) {
+            intent.putExtra("videoId", videoId);
+        }
         startService(intent);
     }
 

@@ -67,7 +67,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 #micOv .b{background:linear-gradient(135deg,#818cf8,#a78bfa);width:104px;height:104px;border-radius:50%;display:flex;justify-content:center;align-items:center;font-size:44px;animation:pulse 1.3s ease-in-out infinite;box-shadow:0 0 80px rgba(129,140,248,.25),0 0 160px rgba(129,140,248,.1)}
 @keyframes pulse{0%{transform:scale(1);opacity:1}50%{transform:scale(1.06);opacity:.85}100%{transform:scale(1);opacity:1}}
 #micOv .tx{position:absolute;bottom:22%;color:rgba(255,255,255,.85);font-size:15px;text-align:center;width:80%;background:rgba(255,255,255,.06);padding:16px 20px;border-radius:18px;backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.04);box-shadow:0 4px 24px rgba(0,0,0,.2)}
-#ytWrap{position:fixed;left:0;top:0;width:100%;height:100px;opacity:.01;pointer-events:none;z-index:-1}
+#ytWrap{position:absolute;left:-9999px;top:-9999px;width:400px;height:300px}
 .qi{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:12px;cursor:pointer;transition:all .15s;margin:2px 0}
 .qi:hover{background:rgba(255,255,255,.06)}
 .qi img{width:36px;height:27px;border-radius:6px;object-fit:cover;flex-shrink:0}
@@ -550,11 +550,16 @@ function playSong(i) {
   if(th) { th.src = 'https://img.youtube.com/vi/' + s.id + '/mqdefault.jpg'; th.style.display = 'block'; }
   paused = false; playing = true;
   player.loadVideoById({videoId: s.id, startSeconds: hookStart ? HOOK_SECONDS : 0});
-  player.unMute();
-  player.setVolume((id('volSlider') || {}).value || 80);
+  // Small delay before unMute ensures player state is ready
+  setTimeout(function() {
+    if (player && player.unMute) {
+      player.unMute();
+      player.setVolume((id('volSlider') || {}).value || 80);
+    }
+  }, 200);
   txt('playBtn', '||');
   updateMediaSession(s);
-  startBackgroundService();
+  startBackgroundService(s.id);
   renderQueue();
   updateFavBtn(s.id);
   var favB = id('favBtn');
@@ -642,9 +647,9 @@ function mediaOnNext() { if(window.sk) sk(); }
 function mediaOnPrev() { if(window.prv) prv(); }
 
 // Background service keeps WebView alive for YouTube playback when minimized
-function startBackgroundService() {
+function startBackgroundService(videoId) {
   if(window.MediaBridge) {
-    window.MediaBridge.startBgService();
+    window.MediaBridge.startBgService(videoId || '');
     window.MediaBridge.updateMediaWithVid(
       (queue[queueIndex]||{}).title||'MoodFlow',
       'Mood Player',
@@ -858,12 +863,13 @@ function onYouTubeIframeAPIReady() {
   try {
     player = new YT.Player('ytP', {
       height: '100%', width: '100%',
-      playerVars: {autoplay: 0, controls: 0, disablekb: 1, fs: 0, modestbranding: 1, iv_load_policy: 3, rel: 0, playsinline: 1},
+      playerVars: {autoplay: 1, controls: 0, disablekb: 1, fs: 0, modestbranding: 1, iv_load_policy: 3, rel: 0, playsinline: 1},
       events: {
         onReady: function() {
           ytReady = true;
           ytRetries = 0;
           player.setVolume((id('volSlider') || {}).value || 80);
+          try { player.getIframe().setAttribute('allow', 'autoplay; fullscreen'); } catch(e) {}
           txt('status', 'Ready');
         },
         onStateChange: function(e) {
