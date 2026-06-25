@@ -26,11 +26,9 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -66,6 +64,8 @@ public class MediaBridge {
         "https://piped.moomoo.me"
     };
 
+    private static final ExecutorService pool = Executors.newCachedThreadPool();
+
     public MediaBridge(Context context, WebView wv) {
         this.ctx = context;
         this.webView = wv;
@@ -82,19 +82,15 @@ public class MediaBridge {
 
     @JavascriptInterface
     public String getStreamUrl(String videoId) {
-        ExecutorService executor = Executors.newFixedThreadPool(Math.min(INVIDIOUS.length + PIPED.length, 16));
         List<Future<String>> futures = new ArrayList<>();
-
         for (String base : INVIDIOUS) {
             final String url = base + "/api/v1/videos/" + videoId;
-            futures.add(executor.submit(() -> fetchInvidious(url)));
+            futures.add(pool.submit(() -> fetchInvidious(url)));
         }
         for (String base : PIPED) {
             final String url = base + "/streams/" + videoId;
-            futures.add(executor.submit(() -> fetchPiped(url)));
+            futures.add(pool.submit(() -> fetchPiped(url)));
         }
-
-        executor.shutdown();
         long deadline = System.currentTimeMillis() + 6000;
         String result = null;
         try {

@@ -575,8 +575,12 @@ function playSong(i) {
       audioPlayer.volume = (id('volSlider') || {}).value / 100 || 0.8;
       audioPlayer.play();
       txt('status', 'Playing');
+      // Start native ExoPlayer after 2s delay (for background playback, no UI lag)
       if (window.MediaBridge && window.MediaBridge.playNativeAudio) {
-        window.MediaBridge.playNativeAudio(url, s.id);
+        var _url = url; var _vid = s.id;
+        setTimeout(function() {
+          try { window.MediaBridge.playNativeAudio(_url, _vid); } catch(e) {}
+        }, 2000);
       }
     } else if (ytReady && player) {
       // Fallback: YouTube iframe
@@ -1002,15 +1006,6 @@ function tick() {
     var d = player.getDuration();
     var c = player.getCurrentTime();
     if (d > 0) wid('prog', (c / d * 100) + '%');
-  }
-  if (usingAudio && window.MediaBridge && window.MediaBridge.isNativeAudioActive) {
-    try {
-      if (window.MediaBridge.isNativeAudioActive()) {
-        if (!audioPlayer.muted) audioPlayer.muted = true;
-      } else {
-        if (audioPlayer.muted) audioPlayer.muted = false;
-      }
-    } catch(e) {}
   }
   if (playing) raf = setTimeout(tick, 2000);
 }
