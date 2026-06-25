@@ -229,13 +229,23 @@ public class MediaBridge {
     }
 
     @JavascriptInterface
+    public boolean isNativeAudioActive() {
+        return MediaPlaybackService.nativeAudioActive;
+    }
+
+    @JavascriptInterface
     public void playNativeAudio(final String videoId) {
         new Thread(() -> {
             try {
-                // Method 1: Piped API (free YouTube proxy)
-                String audioUrl = fetchPipedAudio(videoId);
+                // Method 1: Cobalt API (most reliable, uses yt-dlp)
+                String audioUrl = fetchCobaltAudio(videoId);
 
-                // Method 2: NewPipeExtractor
+                // Method 2: Piped API (free YouTube proxy)
+                if (audioUrl == null) {
+                    audioUrl = fetchPipedAudio(videoId);
+                }
+
+                // Method 3: NewPipeExtractor
                 if (audioUrl == null) {
                     try {
                         StreamInfo info = StreamInfo.getInfo("https://www.youtube.com/watch?v=" + videoId);
@@ -274,6 +284,51 @@ public class MediaBridge {
                 Log.e(TAG, "playNativeAudio error for " + videoId, e);
             }
         }).start();
+    }
+
+    private String fetchCobaltAudio(String videoId) {
+        try {
+            URL url = new URL("https://co.wuk.sh/api/json");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("Accept", "application/json");
+            conn.setRequestProperty("User-Agent", "okhttp/4.12.0");
+            conn.setDoOutput(true);
+            conn.setConnectTimeout(10000);
+            conn.setReadTimeout(10000);
+
+            String body = "{\"url\":\"https://youtube.com/watch?v=" + videoId + "\",\"aFormat\":\"mp3\",\"isAudioOnly\":true,\"vQuality\":\"max\"}";
+            conn.getOutputStream().write(body.getBytes("UTF-8"));
+            conn.connect();
+
+            if (conn.getResponseCode() != 200) {
+                Log.w(TAG, "Cobalt response " + conn.getResponseCode());
+                conn.disconnect();
+                return null;
+            }
+
+            String json = new BufferedReader(new InputStreamReader(conn.getInputStream()))
+                .lines().collect(java.util.stream.Collectors.joining("\n"));
+            conn.disconnect();
+
+            // Parse {"status":"tunnel","url":"...","filename":"..."}
+            int urlIdx = json.indexOf("\"url\"");
+            if (urlIdx < 0) return null;
+            int urlStart = json.indexOf("\"", urlIdx + 6) + 1;
+            if (urlStart <= 6) return null;
+            int urlEnd = json.indexOf("\"", urlStart);
+            if (urlEnd < 0) return null;
+            String resultUrl = json.substring(urlStart, urlEnd)
+                .replace("\\u0026", "&").replace("\\/", "/").replace("\\\\", "");
+            if (resultUrl != null && !resultUrl.isEmpty() && !resultUrl.startsWith("data:")) {
+                Log.d(TAG, "Cobalt OK: " + resultUrl.substring(0, Math.min(60, resultUrl.length())));
+                return resultUrl;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Cobalt failed", e);
+        }
+        return null;
     }
 
     private String fetchPipedAudio(String videoId) {

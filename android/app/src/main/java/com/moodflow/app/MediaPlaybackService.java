@@ -35,6 +35,8 @@ public class MediaPlaybackService extends Service {
     public static final String EXTRA_AUDIO_URL = "audioUrl";
     public static final String EXTRA_VIDEO_ID = "videoId";
 
+    public static boolean nativeAudioActive = false;
+
     private MediaSession mediaSession;
     private ExoPlayer exoPlayer;
     private String currentTitle = "MoodFlow";
@@ -146,6 +148,7 @@ public class MediaPlaybackService extends Service {
             exoPlayer.prepare();
             exoPlayer.setPlayWhenReady(true);
             isPlaying = true;
+            nativeAudioActive = true;
             updateMetadata();
             updateNotification();
             sendBroadcast(new Intent("com.moodflow.app.media.AUDIO_STARTED")
@@ -164,6 +167,7 @@ public class MediaPlaybackService extends Service {
             } catch (Exception ignored) {}
         }
         isPlaying = false;
+        nativeAudioActive = false;
         updateNotification();
     }
 

@@ -548,31 +548,24 @@ function playSong(i) {
   txt('sub', (i+1) + '/' + queue.length);
   var th = id('thumb');
   if(th) { th.src = 'https://img.youtube.com/vi/' + s.id + '/mqdefault.jpg'; th.style.display = 'block'; }
-  triggerBurst();
-  if(window.MediaBridge) {
-    paused = false; playing = true; txt('playBtn','||');
-    player.mute();
-    player.cueVideoById({videoId: s.id, startSeconds: hookStart ? HOOK_SECONDS : 0});
-  } else {
-    player.mute();
-    player.loadVideoById({videoId: s.id, startSeconds: hookStart ? HOOK_SECONDS : 0});
-  }
+  paused = false; playing = true;
+  player.loadVideoById({videoId: s.id, startSeconds: hookStart ? HOOK_SECONDS : 0});
+  player.unMute();
+  player.setVolume((id('volSlider') || {}).value || 80);
   txt('playBtn', '||');
   updateMediaSession(s);
 
-  // Native audio fetch for background playback
+  // Try native audio for background playback
   if(window.MediaBridge) {
     window.MediaBridge.updateMediaWithVid(s.title || s.id, 'Mood Player', s.id, true);
     window.MediaBridge.playNativeAudio(s.id);
-    // Fallback: if native audio doesn't start within 5s, load and unmute YouTube
-    if(window._nativeFallbackTimer) clearTimeout(window._nativeFallbackTimer);
-    window._nativeFallbackTimer = setTimeout(function(){
-      if(!window._nativeAudioStarted && player) {
-        player.loadVideoById({videoId: s.id, startSeconds: hookStart ? HOOK_SECONDS : 0});
-        player.unMute();
-        player.setVolume((id('volSlider') || {}).value || 80);
+    // After 3s, if native audio is playing, mute YouTube to avoid double audio
+    if(window._nativeCheckTimer) clearTimeout(window._nativeCheckTimer);
+    window._nativeCheckTimer = setTimeout(function(){
+      if(window.MediaBridge && window.MediaBridge.isNativeAudioActive && window.MediaBridge.isNativeAudioActive()) {
+        player.mute();
       }
-    }, 5000);
+    }, 3000);
   }
   renderQueue();
   updateFavBtn(s.id);
@@ -588,13 +581,15 @@ function playSong(i) {
 function doPlay() {
   if(!ytReady || !player) { txt('status', 'Loading...'); loadYT(); return; }
   if(playing) {
-    if(window.MediaBridge) { window.MediaBridge.pause(); } else { player.pauseVideo(); }
+    player.pauseVideo();
+    if(window.MediaBridge) { window.MediaBridge.pause(); }
     return;
   }
   if(queueIndex >= 0 && queue.length > 0) {
-    if(window.MediaBridge) {
-      window.MediaBridge.play();
-    } else { player.playVideo(); player.setVolume((id('volSlider') || {}).value || 80); player.unMute(); }
+    player.playVideo();
+    player.setVolume((id('volSlider') || {}).value || 80);
+    player.unMute();
+    if(window.MediaBridge) { window.MediaBridge.play(); }
     return;
   }
   wid('prog', '0%');
@@ -609,7 +604,6 @@ function doPlay() {
 
 function sk() {
   if(!ytReady || !player || !queue.length) return;
-  window._nativeAudioStarted = false;
   stopNativeAudio();
   var c = document.querySelector('.container');
   if(c) { c.classList.remove('swipeL','swipeR'); void c.offsetWidth; c.classList.add('swipeL'); }
@@ -619,7 +613,6 @@ function sk() {
 }
 function prv() {
   if(!ytReady || !player || !queue.length) return;
-  window._nativeAudioStarted = false;
   stopNativeAudio();
   var c = document.querySelector('.container');
   if(c) { c.classList.remove('swipeL','swipeR'); void c.offsetWidth; c.classList.add('swipeR'); }
@@ -630,7 +623,6 @@ function prv() {
 
 function stp() {
   if(!ytReady || !player) return;
-  window._nativeAudioStarted = false;
   stopNativeAudio();
   player.stopVideo();
   txt('playBtn', 'Play');
@@ -642,6 +634,7 @@ function stp() {
   if(raf) { clearTimeout(raf); raf = null; }
   try { navigator.mediaSession.playbackState = 'none'; } catch(ex) {}
   nativeMedia('hideMedia', {});
+  if(window.MediaBridge) window.MediaBridge.hideMedia();
 }
 
 // Native media bridge: prefers direct JS interface, falls back to Capacitor plugin
@@ -662,15 +655,7 @@ function mediaOnPause() { if(!window.paused) { if(window.MediaBridge) { window.M
 function mediaOnNext() { if(window.sk) sk(); }
 function mediaOnPrev() { if(window.prv) prv(); }
 
-// Native Android MediaPlayer playback (foreground service, survives lock/minimize)
-function onNativeAudioStart() {
-  // Service has started playing native audio - update UI
-  window._nativeAudioStarted = true;
-  if(window._nativeFallbackTimer) { clearTimeout(window._nativeFallbackTimer); window._nativeFallbackTimer = null; }
-  playing = true; paused = false; txt('playBtn','||');
-  if(raf) clearTimeout(raf);
-  raf = setTimeout(tick, 2000);
-}
+// Native Android foreground service playback (survives lock/minimize)
 function stopNativeAudio() {
   try { if(window.MediaBridge) window.MediaBridge.hideMedia(); } catch(ex) {}
 }
@@ -882,25 +867,21 @@ function onYouTubeIframeAPIReady() {
         onStateChange: function(e) {
           try {
             if(e.data === YT.PlayerState.PLAYING) {
-              if(window.MediaBridge) return; // native audio handles playback
               playing = true;
               txt('playBtn', '||');
               try { navigator.mediaSession.playbackState = 'playing'; } catch(ex) {}
               nativeMedia('setPlaying', {playing: true});
-              player.unMute();
               player.setVolume((id('volSlider') || {}).value || 80);
               if(buffTimer) { clearTimeout(buffTimer); buffTimer = null; }
               if(raf) clearTimeout(raf);
               raf = setTimeout(tick, 2000);
             } else if(e.data === YT.PlayerState.PAUSED) {
-              if(window.MediaBridge) return; // native audio handles playback
               playing = false;
               try { navigator.mediaSession.playbackState = 'paused'; } catch(ex) {}
               nativeMedia('setPlaying', {playing: false});
               if(buffTimer) { clearTimeout(buffTimer); buffTimer = null; }
               if(raf) { clearTimeout(raf); raf = null; }
             } else if(e.data === YT.PlayerState.ENDED) {
-              if(window.MediaBridge) return; // native audio handles its own ended
               playing = false;
               if(buffTimer) { clearTimeout(buffTimer); buffTimer = null; }
               if(raf) { clearTimeout(raf); raf = null; }
@@ -914,7 +895,6 @@ function onYouTubeIframeAPIReady() {
               if(queueIndex + 1 < queue.length) playSong(queueIndex + 1);
               else { queue = freshQueue(); playSong(0); }
             } else if(e.data === YT.PlayerState.BUFFERING) {
-              if(window.MediaBridge) return;
               txt('status', 'Loading...');
               if(buffTimer) clearTimeout(buffTimer);
               buffTimer = setTimeout(buffTimeout, 8000);
@@ -922,7 +902,6 @@ function onYouTubeIframeAPIReady() {
           } catch(ex) { txt('status', 'State error: ' + ex.message); }
         },
         onError: function() {
-          if(window.MediaBridge) return;
           if(buffTimer) { clearTimeout(buffTimer); buffTimer = null; }
           if(savedQueue.length > 0) {
             queue = savedQueue; queueIndex = savedIndex; savedQueue = []; savedIndex = -1;
