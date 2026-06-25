@@ -65,7 +65,7 @@ public class MediaBridge {
                             String body = new BufferedReader(new InputStreamReader(is))
                                 .lines().collect(java.util.stream.Collectors.joining("\n"));
                             java.util.Map<String, java.util.List<String>> respHeaders = conn.getHeaderFields();
-                            return new Response(code, body, request.url(), respHeaders, request.url(), null);
+                            return new Response(code, body, respHeaders, request.url(), null);
                         } catch (Exception e) {
                             throw new RuntimeException(e);
                         }
