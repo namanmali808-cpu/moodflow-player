@@ -24,8 +24,16 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class MediaBridge {
 
@@ -33,6 +41,30 @@ public class MediaBridge {
 
     private Context ctx;
     private WebView webView;
+
+    private static final String[] INVIDIOUS = {
+        "https://invidious.snopyta.org",
+        "https://yewtu.be",
+        "https://inv.riverside.rocks",
+        "https://invidious.nerdvpn.de",
+        "https://inv.vern.cc",
+        "https://invidious.projectsegfau.lt",
+        "https://invidious.privacydev.net",
+        "https://inv.nadeko.net",
+        "https://inv.odyssey346.dev",
+        "https://yt.artemislena.eu",
+        "https://invidious.fliegendewurst.eu",
+        "https://invidious.weho.st"
+    };
+
+    private static final String[] PIPED = {
+        "https://pipedapi.kavin.rocks",
+        "https://piped-api.garudalinux.org",
+        "https://api.piped.privacydev.net",
+        "https://pipedapi.syncpundit.io",
+        "https://pipedapi.astrid.tech",
+        "https://piped.moomoo.me"
+    };
 
     public MediaBridge(Context context, WebView wv) {
         this.ctx = context;
@@ -48,43 +80,40 @@ public class MediaBridge {
         }
     }
 
-    // Fetches a playable audio URL from YouTube via Invidious or Piped API
     @JavascriptInterface
     public String getStreamUrl(String videoId) {
-        // Method 1: Invidious instances
-        String[] invidiousInstances = {
-            "https://invidious.snopyta.org",
-            "https://yewtu.be",
-            "https://inv.riverside.rocks",
-            "https://invidious.nerdvpn.de",
-            "https://inv.vern.cc",
-            "https://invidious.projectsegfau.lt",
-            "https://invidious.privacydev.net",
-            "https://inv.nadeko.net"
-        };
-        for (String base : invidiousInstances) {
-            try {
-                String result = fetchInvidious(base + "/api/v1/videos/" + videoId);
-                if (result != null) return result;
-            } catch (Exception ignored) {}
+        ExecutorService executor = Executors.newFixedThreadPool(Math.min(INVIDIOUS.length + PIPED.length, 16));
+        List<Future<String>> futures = new ArrayList<>();
+
+        for (String base : INVIDIOUS) {
+            final String url = base + "/api/v1/videos/" + videoId;
+            futures.add(executor.submit(() -> fetchInvidious(url)));
+        }
+        for (String base : PIPED) {
+            final String url = base + "/streams/" + videoId;
+            futures.add(executor.submit(() -> fetchPiped(url)));
         }
 
-        // Method 2: Piped instances
-        String[] pipedInstances = {
-            "https://pipedapi.kavin.rocks",
-            "https://piped-api.garudalinux.org",
-            "https://api.piped.privacydev.net",
-            "https://pipedapi.syncpundit.io",
-            "https://pipedapi.astrid.tech"
-        };
-        for (String base : pipedInstances) {
-            try {
-                String result = fetchPiped(base + "/streams/" + videoId);
-                if (result != null) return result;
-            } catch (Exception ignored) {}
-        }
-
-        return null;
+        executor.shutdown();
+        long deadline = System.currentTimeMillis() + 6000;
+        String result = null;
+        try {
+            while (System.currentTimeMillis() < deadline) {
+                for (Future<String> f : futures) {
+                    if (f.isDone()) {
+                        String val = f.get();
+                        if (val != null && !val.isEmpty()) {
+                            result = val;
+                            break;
+                        }
+                    }
+                }
+                if (result != null) break;
+                Thread.sleep(50);
+            }
+        } catch (Exception ignored) {}
+        executor.shutdownNow();
+        return result;
     }
 
     private String fetchInvidious(String apiUrl) {
@@ -93,13 +122,12 @@ public class MediaBridge {
             URL url = new URL(apiUrl);
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36");
-            conn.setConnectTimeout(8000);
-            conn.setReadTimeout(8000);
+            conn.setConnectTimeout(3000);
+            conn.setReadTimeout(3000);
             conn.connect();
             if (conn.getResponseCode() != 200) return null;
             String json = new BufferedReader(new InputStreamReader(conn.getInputStream()))
-                .lines().collect(java.util.stream.Collectors.joining("\n"));
-            // Find adaptiveFormats array
+                .lines().collect(Collectors.joining("\n"));
             int afIdx = json.indexOf("\"adaptiveFormats\"");
             if (afIdx < 0) return null;
             int arrStart = json.indexOf("[", afIdx);
@@ -112,8 +140,6 @@ public class MediaBridge {
             }
             if (arrEnd < 0) return null;
             String arrContent = json.substring(arrStart, arrEnd);
-
-            // Find best audio format (m4a > webm)
             Pattern urlP = Pattern.compile("\"url\"\\s*:\\s*\"([^\"]+)\"");
             Pattern typeP = Pattern.compile("\"type\"\\s*:\\s*\"([^\"]+)\"");
             Pattern bitrateP = Pattern.compile("\"bitrate\"\\s*:\\s*(\\d+)");
@@ -139,7 +165,6 @@ public class MediaBridge {
             }
             return bestUrl;
         } catch (Exception e) {
-            Log.w(TAG, "Invidious failed: " + apiUrl, e);
             return null;
         } finally {
             if (conn != null) conn.disconnect();
@@ -152,13 +177,12 @@ public class MediaBridge {
             URL url = new URL(apiUrl);
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36");
-            conn.setConnectTimeout(8000);
-            conn.setReadTimeout(8000);
+            conn.setConnectTimeout(3000);
+            conn.setReadTimeout(3000);
             conn.connect();
             if (conn.getResponseCode() != 200) return null;
             String json = new BufferedReader(new InputStreamReader(conn.getInputStream()))
-                .lines().collect(java.util.stream.Collectors.joining("\n"));
-            // Find audioStreams array
+                .lines().collect(Collectors.joining("\n"));
             int audioIdx = json.indexOf("\"audioStreams\"");
             if (audioIdx < 0) return null;
             int arrStart = json.indexOf("[", audioIdx);
@@ -188,7 +212,6 @@ public class MediaBridge {
             }
             return bestUrl;
         } catch (Exception e) {
-            Log.w(TAG, "Piped failed: " + apiUrl, e);
             return null;
         } finally {
             if (conn != null) conn.disconnect();
@@ -197,6 +220,20 @@ public class MediaBridge {
 
     private String decodeJsonString(String s) {
         return s.replace("\\u0026", "&").replace("\\/", "/").replace("\\\\", "\\");
+    }
+
+    @JavascriptInterface
+    public void playNativeAudio(String url, String videoId) {
+        Intent intent = new Intent(MediaPlaybackService.ACTION_PLAY_AUDIO);
+        intent.setPackage(ctx.getPackageName());
+        intent.putExtra(MediaPlaybackService.EXTRA_AUDIO_URL, url);
+        intent.putExtra(MediaPlaybackService.EXTRA_VIDEO_ID, videoId);
+        ctx.sendBroadcast(intent);
+    }
+
+    @JavascriptInterface
+    public boolean isNativeAudioActive() {
+        return MediaPlaybackService.nativeAudioActive;
     }
 
     @JavascriptInterface

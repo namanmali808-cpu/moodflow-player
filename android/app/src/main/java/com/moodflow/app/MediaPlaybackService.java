@@ -16,6 +16,9 @@ import android.os.IBinder;
 import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.Player;
+import androidx.media3.exoplayer.ExoPlayer;
 
 public class MediaPlaybackService extends Service {
 
@@ -25,8 +28,15 @@ public class MediaPlaybackService extends Service {
     public static final String ACTION_PAUSE = "com.moodflow.app.media.PAUSE";
     public static final String ACTION_NEXT = "com.moodflow.app.media.NEXT";
     public static final String ACTION_PREV = "com.moodflow.app.media.PREV";
+    public static final String ACTION_PLAY_AUDIO = "com.moodflow.app.media.PLAY_AUDIO";
+    public static final String ACTION_STOP_AUDIO = "com.moodflow.app.media.STOP_AUDIO";
+    public static final String EXTRA_AUDIO_URL = "audioUrl";
+    public static final String EXTRA_VIDEO_ID = "videoId";
+
+    public static boolean nativeAudioActive = false;
 
     private MediaSession mediaSession;
+    private ExoPlayer exoPlayer;
     private String currentTitle = "MoodFlow";
     private String currentArtist = "";
     private boolean isPlaying = false;
@@ -61,13 +71,32 @@ public class MediaPlaybackService extends Service {
             public void onStop() { stopSelf(); }
         });
         mediaSession.setActive(true);
-        updatePlaybackState();
+
+        exoPlayer = new ExoPlayer.Builder(this).build();
+        exoPlayer.addListener(new Player.Listener() {
+            @Override
+            public void onPlaybackStateChanged(int playbackState) {
+                if (playbackState == Player.STATE_ENDED) {
+                    sendBroadcast(new Intent("com.moodflow.app.media.SONG_ENDED").setPackage(getPackageName()));
+                } else if (playbackState == Player.STATE_READY) {
+                    nativeAudioActive = true;
+                }
+            }
+            @Override
+            public void onIsPlayingChanged(boolean playing) {
+                isPlaying = playing;
+                nativeAudioActive = playing;
+                updateNotification();
+            }
+        });
 
         IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_PLAY);
         filter.addAction(ACTION_PAUSE);
         filter.addAction(ACTION_NEXT);
         filter.addAction(ACTION_PREV);
+        filter.addAction(ACTION_PLAY_AUDIO);
+        filter.addAction(ACTION_STOP_AUDIO);
         int flags = 0;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) flags = Context.RECEIVER_NOT_EXPORTED;
         registerReceiver(actionReceiver, filter, flags);
@@ -84,13 +113,15 @@ public class MediaPlaybackService extends Service {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             if (ACTION_PLAY.equals(action)) {
-                isPlaying = true;
-                updatePlaybackState();
-                updateNotification();
+                if (exoPlayer != null) { exoPlayer.setPlayWhenReady(true); isPlaying = true; updateNotification(); }
             } else if (ACTION_PAUSE.equals(action)) {
-                isPlaying = false;
-                updatePlaybackState();
-                updateNotification();
+                if (exoPlayer != null) { exoPlayer.setPlayWhenReady(false); isPlaying = false; updateNotification(); }
+            } else if (ACTION_PLAY_AUDIO.equals(action)) {
+                String url = intent.getStringExtra(EXTRA_AUDIO_URL);
+                String vid = intent.getStringExtra(EXTRA_VIDEO_ID);
+                if (url != null && !url.isEmpty()) playAudioUrl(url, vid);
+            } else if (ACTION_STOP_AUDIO.equals(action)) {
+                stopAudio();
             } else if (ACTION_NEXT.equals(action)) {
                 sendBroadcast(new Intent("com.moodflow.app.media.NEXT_SONG").setPackage(getPackageName()));
             } else if (ACTION_PREV.equals(action)) {
@@ -99,56 +130,76 @@ public class MediaPlaybackService extends Service {
         }
     };
 
+    private void playAudioUrl(String url, String videoId) {
+        try {
+            stopAudio();
+            currentVideoId = videoId != null ? videoId : "";
+            MediaItem mediaItem = MediaItem.fromUri(url);
+            exoPlayer.setMediaItem(mediaItem);
+            exoPlayer.prepare();
+            exoPlayer.setPlayWhenReady(true);
+            isPlaying = true;
+            nativeAudioActive = true;
+            updateMetadata();
+            updateNotification();
+        } catch (Exception e) {
+            Log.e("MoodFlow", "playAudioUrl failed", e);
+            nativeAudioActive = false;
+        }
+    }
+
+    private void stopAudio() {
+        if (exoPlayer != null) { try { exoPlayer.stop(); } catch (Exception ignored) {} }
+        isPlaying = false;
+        nativeAudioActive = false;
+        updateNotification();
+    }
+
+    private void updateMetadata() {
+        try {
+            mediaSession.setMetadata(
+                new android.media.MediaMetadata.Builder()
+                    .putString(android.media.MediaMetadata.METADATA_KEY_TITLE, currentTitle)
+                    .putString(android.media.MediaMetadata.METADATA_KEY_ARTIST, currentArtist)
+                    .putString(android.media.MediaMetadata.METADATA_KEY_MEDIA_ID, currentVideoId)
+                    .build()
+            );
+        } catch (Exception ignored) {}
+    }
+
     private Notification buildNotification() {
         Intent launchIntent = getPackageManager().getLaunchIntentForPackage(getPackageName());
         PendingIntent contentIntent = PendingIntent.getActivity(this, 0, launchIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
         int playIcon = isPlaying ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play;
-
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_media_play)
-                .setContentTitle(currentTitle)
-                .setContentText(currentArtist)
-                .setContentIntent(contentIntent)
-                .setOngoing(true)
-                .setShowWhen(false)
+                .setContentTitle(currentTitle).setContentText(currentArtist)
+                .setContentIntent(contentIntent).setOngoing(true).setShowWhen(false)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .addAction(0, "Previous", pendingBroadcast(ACTION_PREV))
                 .addAction(playIcon, isPlaying ? "Pause" : "Play", pendingBroadcast(isPlaying ? ACTION_PAUSE : ACTION_PLAY))
                 .addAction(0, "Next", pendingBroadcast(ACTION_NEXT))
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setSilent(true);
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC).setSilent(true);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
             builder.setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE);
-        }
-
         return builder.build();
     }
 
     private void updateNotification() {
-        try {
-            NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-            nm.notify(NOTIF_ID, buildNotification());
-        } catch (Exception ignored) {}
-    }
-
-    private void updatePlaybackState() {
+        try { ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).notify(NOTIF_ID, buildNotification()); } catch (Exception ignored) {}
         try {
             int state = isPlaying ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED;
             mediaSession.setPlaybackState(new PlaybackState.Builder()
                     .setState(state, PlaybackState.PLAYBACK_POSITION_UNKNOWN, 1.0f)
                     .setActions(PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE |
-                            PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS |
-                            PlaybackState.ACTION_STOP)
+                            PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS | PlaybackState.ACTION_STOP)
                     .build());
         } catch (Exception ignored) {}
     }
 
     private PendingIntent pendingBroadcast(String action) {
-        Intent intent = new Intent(action);
-        intent.setPackage(getPackageName());
+        Intent intent = new Intent(action); intent.setPackage(getPackageName());
         return PendingIntent.getBroadcast(this, action.hashCode(), intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
@@ -158,28 +209,15 @@ public class MediaPlaybackService extends Service {
         if (intent != null) {
             String action = intent.getAction();
             if ("START".equals(action)) {
-                // Service is already running via startForeground, just update
-                try {
-                    startForeground(NOTIF_ID, buildNotification());
-                } catch (Exception ignored) {}
+                try { startForeground(NOTIF_ID, buildNotification()); } catch (Exception ignored) {}
             } else if ("UPDATE_META".equals(action)) {
                 if (intent.hasExtra("title")) currentTitle = intent.getStringExtra("title");
                 if (intent.hasExtra("artist")) currentArtist = intent.getStringExtra("artist");
                 if (intent.hasExtra("videoId")) currentVideoId = intent.getStringExtra("videoId");
                 if (intent.hasExtra("playing")) isPlaying = intent.getBooleanExtra("playing", false);
-                mediaSession.setMetadata(
-                    new android.media.MediaMetadata.Builder()
-                        .putString(android.media.MediaMetadata.METADATA_KEY_TITLE, currentTitle)
-                        .putString(android.media.MediaMetadata.METADATA_KEY_ARTIST, currentArtist)
-                        .putString(android.media.MediaMetadata.METADATA_KEY_MEDIA_ID, currentVideoId)
-                        .build()
-                );
-                updatePlaybackState();
-                updateNotification();
+                updateMetadata(); updateNotification();
             }
-            if ("STOP".equals(action)) {
-                stopSelf();
-            }
+            if ("STOP".equals(action)) { stopAudio(); stopSelf(); }
         }
         return START_STICKY;
     }
@@ -189,8 +227,9 @@ public class MediaPlaybackService extends Service {
 
     @Override
     public void onDestroy() {
-        mediaSession.setActive(false);
-        mediaSession.release();
+        if (exoPlayer != null) { try { exoPlayer.release(); } catch (Exception ignored) {} exoPlayer = null; }
+        nativeAudioActive = false;
+        mediaSession.setActive(false); mediaSession.release();
         try { unregisterReceiver(actionReceiver); } catch (Exception ignored) {}
         try { stopForeground(true); } catch (Exception ignored) {}
         super.onDestroy();

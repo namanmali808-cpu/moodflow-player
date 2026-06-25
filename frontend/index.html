@@ -575,6 +575,9 @@ function playSong(i) {
       audioPlayer.volume = (id('volSlider') || {}).value / 100 || 0.8;
       audioPlayer.play();
       txt('status', 'Playing');
+      if (window.MediaBridge && window.MediaBridge.playNativeAudio) {
+        window.MediaBridge.playNativeAudio(url, s.id);
+      }
     } else if (ytReady && player) {
       // Fallback: YouTube iframe
       usingAudio = false;
@@ -669,6 +672,7 @@ function prv() {
 }
 
 function stopBgAudio() {
+  try { if (window.MediaBridge && window.MediaBridge.stopBgService) window.MediaBridge.stopBgService(); } catch(e) {}
   try { audioPlayer.pause(); audioPlayer.src = ''; } catch(e) {}
   try { if (player) player.stopVideo(); } catch(e) {}
   usingAudio = false;
@@ -998,6 +1002,15 @@ function tick() {
     var d = player.getDuration();
     var c = player.getCurrentTime();
     if (d > 0) wid('prog', (c / d * 100) + '%');
+  }
+  if (usingAudio && window.MediaBridge && window.MediaBridge.isNativeAudioActive) {
+    try {
+      if (window.MediaBridge.isNativeAudioActive()) {
+        if (!audioPlayer.muted) audioPlayer.muted = true;
+      } else {
+        if (audioPlayer.muted) audioPlayer.muted = false;
+      }
+    } catch(e) {}
   }
   if (playing) raf = setTimeout(tick, 2000);
 }
