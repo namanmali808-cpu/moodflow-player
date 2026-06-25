@@ -1,11 +1,11 @@
 package com.moodflow.app;
 
-import android.app.DownloadManager;
-import android.content.BroadcastReceiver;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
-import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -14,9 +14,12 @@ import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 
 import androidx.core.content.FileProvider;
+import androidx.core.app.NotificationCompat;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
@@ -32,7 +35,6 @@ public class MediaBridge {
 
     private Context ctx;
     private WebView webView;
-    private long lastDownloadId = -1;
 
     public MediaBridge(Context context, WebView wv) {
         this.ctx = context;
@@ -40,55 +42,93 @@ public class MediaBridge {
     }
 
     @JavascriptInterface
-    public void downloadApk(String url) {
+    public void downloadApk(final String url) {
         if (url == null || url.isEmpty()) return;
-        String fileName = "MoodFlow-" + System.currentTimeMillis() + ".apk";
-        DownloadManager dm = (DownloadManager) ctx.getSystemService(Context.DOWNLOAD_SERVICE);
-        DownloadManager.Request req = new DownloadManager.Request(Uri.parse(url));
-        req.setTitle("MoodFlow Update");
-        req.setDescription("Downloading update...");
-        req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-        req.setMimeType("application/vnd.android.package-archive");
-        if (Build.VERSION.SDK_INT >= 29) {
-            req.setDestinationInExternalFilesDir(ctx, null, fileName);
-        } else {
-            req.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
-        }
-        final long downloadId = dm.enqueue(req);
-        lastDownloadId = downloadId;
-        ctx.registerReceiver(new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
-                if (id == downloadId) {
-                    try {
-                        DownloadManager.Query q = new DownloadManager.Query();
-                        q.setFilterById(downloadId);
-                        Cursor c = dm.query(q);
-                        if (c != null && c.moveToFirst()) {
-                            int status = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
-                            if (status == DownloadManager.STATUS_SUCCESSFUL) {
-                                String uriStr = c.getString(c.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI));
-                                c.close();
-                                Uri fileUri = Uri.parse(uriStr);
-                                Intent install = new Intent(Intent.ACTION_VIEW);
-                                if (Build.VERSION.SDK_INT >= 24) {
-                                    File f = new File(fileUri.getPath());
-                                    Uri contentUri = FileProvider.getUriForFile(ctx, "com.moodflow.app.fileprovider", f);
-                                    install.setDataAndType(contentUri, "application/vnd.android.package-archive");
-                                    install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                                } else {
-                                    install.setDataAndType(fileUri, "application/vnd.android.package-archive");
-                                }
-                                install.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                                ctx.startActivity(install);
-                            }
-                        }
-                    } catch (Exception ignored) {}
-                    try { context.unregisterReceiver(this); } catch (Exception ignored) {}
+        new Thread(() -> {
+            try {
+                // Download APK directly with HttpURLConnection (more reliable than DownloadManager)
+                HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36");
+                conn.setInstanceFollowRedirects(true);
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(30000);
+                conn.connect();
+
+                int len = conn.getContentLength();
+                String fileName = "MoodFlow-" + System.currentTimeMillis() + ".apk";
+
+                File dir;
+                if (Build.VERSION.SDK_INT >= 29) {
+                    dir = ctx.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+                } else {
+                    dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
                 }
+                if (dir != null && !dir.exists()) dir.mkdirs();
+                File apkFile = new File(dir, fileName);
+
+                InputStream in = conn.getInputStream();
+                FileOutputStream out = new FileOutputStream(apkFile);
+                byte[] buf = new byte[8192];
+                int read, total = 0;
+                int lastPct = -1;
+                while ((read = in.read(buf)) != -1) {
+                    out.write(buf, 0, read);
+                    total += read;
+                    if (len > 0) {
+                        int pct = total * 100 / len;
+                        if (pct != lastPct) {
+                            lastPct = pct;
+                            showDownloadNotification(pct);
+                        }
+                    }
+                }
+                in.close();
+                out.close();
+                conn.disconnect();
+
+                dismissDownloadNotification();
+                installApk(apkFile);
+            } catch (Exception e) {
+                Log.e(TAG, "downloadApk failed", e);
             }
-        }, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
+        }).start();
+    }
+
+    private void showDownloadNotification(int pct) {
+        NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            nm.createNotificationChannel(new NotificationChannel("download", "Downloads", NotificationManager.IMPORTANCE_LOW));
+        }
+        Notification notif = new NotificationCompat.Builder(ctx, "download")
+            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setContentTitle("MoodFlow Update")
+            .setContentText("Downloading... " + pct + "%")
+            .setProgress(100, pct, false)
+            .setOngoing(true)
+            .build();
+        nm.notify(1001, notif);
+    }
+
+    private void dismissDownloadNotification() {
+        NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+        nm.cancel(1001);
+        Notification notif = new NotificationCompat.Builder(ctx, "download")
+            .setSmallIcon(android.R.drawable.stat_sys_download_done)
+            .setContentTitle("MoodFlow Update")
+            .setContentText("Download complete")
+            .setAutoCancel(true)
+            .setProgress(0, 0, false)
+            .build();
+        nm.notify(1001, notif);
+    }
+
+    private void installApk(File apkFile) {
+        Intent install = new Intent(Intent.ACTION_VIEW);
+        Uri uri = FileProvider.getUriForFile(ctx, "com.moodflow.app.fileprovider", apkFile);
+        install.setDataAndType(uri, "application/vnd.android.package-archive");
+        install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        install.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        ctx.startActivity(install);
     }
 
     @JavascriptInterface
