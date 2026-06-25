@@ -17,7 +17,6 @@ import androidx.core.content.FileProvider;
 import androidx.core.app.NotificationCompat;
 
 import org.schabi.newpipe.extractor.NewPipe;
-import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.downloader.Request;
 import org.schabi.newpipe.extractor.downloader.Response;
@@ -53,8 +52,10 @@ public class MediaBridge {
                             HttpURLConnection conn = (HttpURLConnection) new URL(request.url()).openConnection();
                             conn.setRequestMethod(request.httpMethod());
                             conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36");
-                            for (java.util.Map.Entry<String, String> h : request.headers().entrySet()) {
-                                conn.setRequestProperty(h.getKey(), h.getValue());
+                            for (java.util.Map.Entry<String, java.util.List<String>> h : request.headers().entrySet()) {
+                                if (h.getValue() != null && !h.getValue().isEmpty()) {
+                                    conn.setRequestProperty(h.getKey(), h.getValue().get(0));
+                                }
                             }
                             conn.setConnectTimeout(10000);
                             conn.setReadTimeout(10000);
@@ -64,7 +65,7 @@ public class MediaBridge {
                             String body = new BufferedReader(new InputStreamReader(is))
                                 .lines().collect(java.util.stream.Collectors.joining("\n"));
                             java.util.Map<String, java.util.List<String>> respHeaders = conn.getHeaderFields();
-                            return new Response(code, body, request.url(), respHeaders);
+                            return new Response(code, body, request.url(), respHeaders, request.url(), null);
                         } catch (Exception e) {
                             throw new RuntimeException(e);
                         }
@@ -229,8 +230,7 @@ public class MediaBridge {
     public void playNativeAudio(final String videoId) {
         new Thread(() -> {
             try {
-                StreamingService service = NewPipe.getService(0);
-                StreamInfo info = StreamInfo.getInfo(service.getStreamLHFactory().fromId(videoId));
+                StreamInfo info = StreamInfo.getInfo("https://www.youtube.com/watch?v=" + videoId);
                 List<AudioStream> audioStreams = info.getAudioStreams();
                 String audioUrl = null;
                 int bestQuality = -1;
