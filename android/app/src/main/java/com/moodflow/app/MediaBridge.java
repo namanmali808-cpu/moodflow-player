@@ -23,7 +23,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -36,34 +35,19 @@ import java.util.stream.Collectors;
 public class MediaBridge {
 
     private static final String TAG = "MoodFlowBridge";
-
     private Context ctx;
     private WebView webView;
 
     private static final String[] INVIDIOUS = {
-        "https://invidious.snopyta.org",
-        "https://yewtu.be",
-        "https://inv.riverside.rocks",
-        "https://invidious.nerdvpn.de",
-        "https://inv.vern.cc",
-        "https://invidious.projectsegfau.lt",
-        "https://invidious.privacydev.net",
-        "https://inv.nadeko.net",
-        "https://inv.odyssey346.dev",
-        "https://yt.artemislena.eu",
-        "https://invidious.fliegendewurst.eu",
-        "https://invidious.weho.st"
+        "https://invidious.snopyta.org", "https://yewtu.be", "https://inv.riverside.rocks",
+        "https://invidious.nerdvpn.de", "https://inv.vern.cc", "https://invidious.projectsegfau.lt",
+        "https://invidious.privacydev.net", "https://inv.nadeko.net", "https://inv.odyssey346.dev",
+        "https://yt.artemislena.eu", "https://invidious.fliegendewurst.eu", "https://invidious.weho.st"
     };
-
     private static final String[] PIPED = {
-        "https://pipedapi.kavin.rocks",
-        "https://piped-api.garudalinux.org",
-        "https://api.piped.privacydev.net",
-        "https://pipedapi.syncpundit.io",
-        "https://pipedapi.astrid.tech",
-        "https://piped.moomoo.me"
+        "https://pipedapi.kavin.rocks", "https://piped-api.garudalinux.org", "https://api.piped.privacydev.net",
+        "https://pipedapi.syncpundit.io", "https://pipedapi.astrid.tech", "https://piped.moomoo.me"
     };
-
     private static final ExecutorService pool = Executors.newCachedThreadPool();
 
     public MediaBridge(Context context, WebView wv) {
@@ -98,10 +82,7 @@ public class MediaBridge {
                 for (Future<String> f : futures) {
                     if (f.isDone()) {
                         String val = f.get();
-                        if (val != null && !val.isEmpty()) {
-                            result = val;
-                            break;
-                        }
+                        if (val != null && !val.isEmpty()) { result = val; break; }
                     }
                 }
                 if (result != null) break;
@@ -154,17 +135,11 @@ public class MediaBridge {
                 if (mime.contains("audio")) score += 100;
                 if (mime.contains("mp4")) score += 50;
                 score += bitrate;
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestUrl = u;
-                }
+                if (score > bestScore) { bestScore = score; bestUrl = u; }
             }
             return bestUrl;
-        } catch (Exception e) {
-            return null;
-        } finally {
-            if (conn != null) conn.disconnect();
-        }
+        } catch (Exception e) { return null; }
+        finally { if (conn != null) conn.disconnect(); }
     }
 
     private String fetchPiped(String apiUrl) {
@@ -201,35 +176,15 @@ public class MediaBridge {
                 int start = Math.max(0, um.start() - 250);
                 Matcher bm = bitrateP.matcher(arrContent.substring(start, um.start()));
                 int rate = bm.find() ? Integer.parseInt(bm.group(1)) : 0;
-                if (rate > bestRate) {
-                    bestRate = rate;
-                    bestUrl = u;
-                }
+                if (rate > bestRate) { bestRate = rate; bestUrl = u; }
             }
             return bestUrl;
-        } catch (Exception e) {
-            return null;
-        } finally {
-            if (conn != null) conn.disconnect();
-        }
+        } catch (Exception e) { return null; }
+        finally { if (conn != null) conn.disconnect(); }
     }
 
     private String decodeJsonString(String s) {
         return s.replace("\\u0026", "&").replace("\\/", "/").replace("\\\\", "\\");
-    }
-
-    @JavascriptInterface
-    public void playNativeAudio(String url, String videoId) {
-        Intent intent = new Intent(MediaPlaybackService.ACTION_PLAY_AUDIO);
-        intent.setPackage(ctx.getPackageName());
-        intent.putExtra(MediaPlaybackService.EXTRA_AUDIO_URL, url);
-        intent.putExtra(MediaPlaybackService.EXTRA_VIDEO_ID, videoId);
-        ctx.sendBroadcast(intent);
-    }
-
-    @JavascriptInterface
-    public boolean isNativeAudioActive() {
-        return MediaPlaybackService.nativeAudioActive;
     }
 
     @JavascriptInterface
@@ -243,10 +198,8 @@ public class MediaBridge {
                 conn.setConnectTimeout(15000);
                 conn.setReadTimeout(30000);
                 conn.connect();
-
                 int len = conn.getContentLength();
                 String fileName = "MoodFlow-" + System.currentTimeMillis() + ".apk";
-
                 File dir;
                 if (Build.VERSION.SDK_INT >= 29) {
                     dir = ctx.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
@@ -255,7 +208,6 @@ public class MediaBridge {
                 }
                 if (dir != null && !dir.exists()) dir.mkdirs();
                 File apkFile = new File(dir, fileName);
-
                 InputStream in = conn.getInputStream();
                 FileOutputStream out = new FileOutputStream(apkFile);
                 byte[] buf = new byte[8192];
@@ -266,21 +218,13 @@ public class MediaBridge {
                     total += read;
                     if (len > 0) {
                         int pct = total * 100 / len;
-                        if (pct != lastPct) {
-                            lastPct = pct;
-                            showDownloadNotification(pct);
-                        }
+                        if (pct != lastPct) { lastPct = pct; showDownloadNotification(pct); }
                     }
                 }
-                in.close();
-                out.close();
-                conn.disconnect();
-
+                in.close(); out.close(); conn.disconnect();
                 dismissDownloadNotification();
                 installApk(apkFile);
-            } catch (Exception e) {
-                Log.e(TAG, "downloadApk failed", e);
-            }
+            } catch (Exception e) { Log.e(TAG, "downloadApk failed", e); }
         }).start();
     }
 
@@ -291,11 +235,8 @@ public class MediaBridge {
         }
         Notification notif = new NotificationCompat.Builder(ctx, "download")
             .setSmallIcon(android.R.drawable.stat_sys_download)
-            .setContentTitle("MoodFlow Update")
-            .setContentText("Downloading... " + pct + "%")
-            .setProgress(100, pct, false)
-            .setOngoing(true)
-            .build();
+            .setContentTitle("MoodFlow Update").setContentText("Downloading... " + pct + "%")
+            .setProgress(100, pct, false).setOngoing(true).build();
         nm.notify(1001, notif);
     }
 
@@ -304,11 +245,8 @@ public class MediaBridge {
         nm.cancel(1001);
         Notification notif = new NotificationCompat.Builder(ctx, "download")
             .setSmallIcon(android.R.drawable.stat_sys_download_done)
-            .setContentTitle("MoodFlow Update")
-            .setContentText("Download complete")
-            .setAutoCancel(true)
-            .setProgress(0, 0, false)
-            .build();
+            .setContentTitle("MoodFlow Update").setContentText("Download complete")
+            .setAutoCancel(true).setProgress(0, 0, false).build();
         nm.notify(1001, notif);
     }
 
@@ -322,62 +260,9 @@ public class MediaBridge {
     }
 
     @JavascriptInterface
-    public void updateMedia(String title, String artist, boolean playing) {
-        Intent intent = new Intent(ctx, MediaPlaybackService.class);
-        intent.setAction("UPDATE_META");
-        intent.putExtra("title", title != null ? title : "MoodFlow");
-        intent.putExtra("artist", artist != null ? artist : "");
-        intent.putExtra("playing", playing);
-        startService(intent);
-    }
-
-    @JavascriptInterface
-    public void updateMediaWithVid(String title, String artist, String videoId, boolean playing) {
-        Intent intent = new Intent(ctx, MediaPlaybackService.class);
-        intent.setAction("UPDATE_META");
-        intent.putExtra("title", title != null ? title : "MoodFlow");
-        intent.putExtra("artist", artist != null ? artist : "");
-        intent.putExtra("videoId", videoId != null ? videoId : "");
-        intent.putExtra("playing", playing);
-        startService(intent);
-    }
-
-    @JavascriptInterface
-    public void setPlaying(boolean playing) {
-        Intent intent = new Intent(ctx, MediaPlaybackService.class);
-        intent.setAction("UPDATE_META");
-        intent.putExtra("playing", playing);
-        startService(intent);
-    }
-
-    @JavascriptInterface
-    public void play() {
-        Intent intent = new Intent(MediaPlaybackService.ACTION_PLAY);
-        intent.setPackage(ctx.getPackageName());
-        ctx.sendBroadcast(intent);
-    }
-
-    @JavascriptInterface
-    public void pause() {
-        Intent intent = new Intent(MediaPlaybackService.ACTION_PAUSE);
-        intent.setPackage(ctx.getPackageName());
-        ctx.sendBroadcast(intent);
-    }
-
-    @JavascriptInterface
-    public void hideMedia() {
-        Intent intent = new Intent(ctx, MediaPlaybackService.class);
-        intent.setAction("STOP");
-        ctx.startService(intent);
-    }
-
-    @JavascriptInterface
     public void startBgService(String videoId) {
         Intent intent = new Intent(ctx, MediaPlaybackService.class);
         intent.setAction("START");
-        if (videoId != null && !videoId.isEmpty()) {
-            intent.putExtra("videoId", videoId);
-        }
         startService(intent);
     }
 
