@@ -6,3 +6,6 @@ android/app/build/
 *.aab
 resources/icon.png
 gen-icon.js
+
+*.apk
+*.apk
