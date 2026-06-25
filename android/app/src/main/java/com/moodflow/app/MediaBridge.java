@@ -31,6 +31,8 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MediaBridge {
 
@@ -230,21 +232,31 @@ public class MediaBridge {
     public void playNativeAudio(final String videoId) {
         new Thread(() -> {
             try {
-                StreamInfo info = StreamInfo.getInfo("https://www.youtube.com/watch?v=" + videoId);
-                List<AudioStream> audioStreams = info.getAudioStreams();
-                String audioUrl = null;
-                int bestQuality = -1;
-                for (AudioStream as : audioStreams) {
-                    if (as.getAverageBitrate() > bestQuality) {
-                        bestQuality = as.getAverageBitrate();
-                        audioUrl = as.getUrl();
+                // Method 1: Piped API (free YouTube proxy)
+                String audioUrl = fetchPipedAudio(videoId);
+
+                // Method 2: NewPipeExtractor
+                if (audioUrl == null) {
+                    try {
+                        StreamInfo info = StreamInfo.getInfo("https://www.youtube.com/watch?v=" + videoId);
+                        List<AudioStream> streams = info.getAudioStreams();
+                        int best = -1;
+                        for (AudioStream as : streams) {
+                            if (as.getAverageBitrate() > best) {
+                                best = as.getAverageBitrate();
+                                audioUrl = as.getUrl();
+                            }
+                        }
+                        if (audioUrl == null && info.getVideoStreams() != null && !info.getVideoStreams().isEmpty()) {
+                            audioUrl = info.getVideoStreams().get(0).getUrl();
+                        }
+                    } catch (Exception npErr) {
+                        Log.e(TAG, "NewPipe failed", npErr);
                     }
                 }
-                if (audioUrl == null && info.getVideoStreams() != null && !info.getVideoStreams().isEmpty()) {
-                    audioUrl = info.getVideoStreams().get(0).getUrl();
-                }
+
                 if (audioUrl != null && !audioUrl.isEmpty()) {
-                    Log.d(TAG, "NewPipe audio URL OK for " + videoId);
+                    Log.d(TAG, "Audio URL OK for " + videoId);
                     Intent metaIntent = new Intent(ctx, MediaPlaybackService.class);
                     metaIntent.setAction("UPDATE_META");
                     metaIntent.putExtra("videoId", videoId);
@@ -256,12 +268,68 @@ public class MediaBridge {
                     playIntent.putExtra(MediaPlaybackService.EXTRA_VIDEO_ID, videoId);
                     ctx.sendBroadcast(playIntent);
                 } else {
-                    Log.e(TAG, "NewPipe: no audio URL for " + videoId);
+                    Log.e(TAG, "All methods failed for " + videoId);
                 }
             } catch (Exception e) {
                 Log.e(TAG, "playNativeAudio error for " + videoId, e);
             }
         }).start();
+    }
+
+    private String fetchPipedAudio(String videoId) {
+        java.util.List<String> instances = java.util.Arrays.asList(
+            "https://pipedapi.kavin.rocks",
+            "https://piped-api.garudalinux.org",
+            "https://api.piped.privacydev.net"
+        );
+        for (String base : instances) {
+            try {
+                URL url = new URL(base + "/streams/" + videoId);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0");
+                conn.setConnectTimeout(8000);
+                conn.setReadTimeout(8000);
+                conn.connect();
+                if (conn.getResponseCode() != 200) continue;
+                String json = new BufferedReader(new InputStreamReader(conn.getInputStream()))
+                    .lines().collect(java.util.stream.Collectors.joining("\n"));
+                conn.disconnect();
+                // Find audioStreams array in JSON
+                int audioIdx = json.indexOf("\"audioStreams\"");
+                if (audioIdx < 0) continue;
+                int arrStart = json.indexOf("[", audioIdx);
+                if (arrStart < 0) continue;
+                int depth = 0, arrEnd = -1;
+                for (int i = arrStart; i < json.length(); i++) {
+                    char c = json.charAt(i);
+                    if (c == '[') depth++;
+                    else if (c == ']') { depth--; if (depth == 0) { arrEnd = i + 1; break; } }
+                }
+                if (arrEnd < 0) continue;
+                String arrContent = json.substring(arrStart, arrEnd);
+                Pattern urlP = Pattern.compile("\"url\"\\s*:\\s*\"([^\"]+)\"");
+                Pattern bitrateP = Pattern.compile("\"bitrate\"\\s*:\\s*(\\d+)");
+                Matcher um = urlP.matcher(arrContent);
+                String bestUrl = null;
+                int bestRate = -1;
+                while (um.find()) {
+                    String u = um.group(1).replace("\\u0026", "&").replace("\\/", "/").replace("\\\\", "");
+                    int start = Math.max(0, um.start() - 250);
+                    String ctxStr = arrContent.substring(start, um.start());
+                    Matcher bm = bitrateP.matcher(ctxStr);
+                    int rate = 0;
+                    if (bm.find()) rate = Integer.parseInt(bm.group(1));
+                    if (rate > bestRate) {
+                        bestRate = rate;
+                        bestUrl = u;
+                    }
+                }
+                if (bestUrl != null && !bestUrl.isEmpty()) return bestUrl;
+            } catch (Exception e) {
+                Log.w(TAG, "Piped failed: " + base, e);
+            }
+        }
+        return null;
     }
 
     private void startService(Intent intent) {

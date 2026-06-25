@@ -9,17 +9,16 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.media.AudioAttributes;
-import android.media.MediaMetadata;
-import android.media.MediaPlayer;
 import android.media.session.MediaSession;
 import android.media.session.PlaybackState;
 import android.os.Build;
 import android.os.IBinder;
-import android.os.PowerManager;
 import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.Player;
+import androidx.media3.exoplayer.ExoPlayer;
 
 import java.io.IOException;
 
@@ -37,7 +36,7 @@ public class MediaPlaybackService extends Service {
     public static final String EXTRA_VIDEO_ID = "videoId";
 
     private MediaSession mediaSession;
-    private MediaPlayer mediaPlayer;
+    private ExoPlayer exoPlayer;
     private String currentTitle = "MoodFlow";
     private String currentArtist = "";
     private boolean isPlaying = false;
@@ -73,15 +72,19 @@ public class MediaPlaybackService extends Service {
         });
         mediaSession.setActive(true);
 
-        // Init MediaPlayer
-        mediaPlayer = new MediaPlayer();
-        mediaPlayer.setWakeMode(getApplicationContext(), PowerManager.PARTIAL_WAKE_LOCK);
-        mediaPlayer.setAudioAttributes(new AudioAttributes.Builder()
-                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                .setUsage(AudioAttributes.USAGE_MEDIA)
-                .build());
-        mediaPlayer.setOnCompletionListener(mp -> {
-            sendBroadcast(new Intent("com.moodflow.app.media.SONG_ENDED").setPackage(getPackageName()));
+        exoPlayer = new ExoPlayer.Builder(this).build();
+        exoPlayer.addListener(new Player.Listener() {
+            @Override
+            public void onPlaybackStateChanged(int playbackState) {
+                if (playbackState == Player.STATE_ENDED) {
+                    sendBroadcast(new Intent("com.moodflow.app.media.SONG_ENDED").setPackage(getPackageName()));
+                }
+            }
+            @Override
+            public void onIsPlayingChanged(boolean playing) {
+                isPlaying = playing;
+                updateNotification();
+            }
         });
 
         IntentFilter filter = new IntentFilter();
@@ -107,14 +110,14 @@ public class MediaPlaybackService extends Service {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             if (ACTION_PLAY.equals(action)) {
-                if (mediaPlayer != null) {
-                    mediaPlayer.start();
+                if (exoPlayer != null) {
+                    exoPlayer.setPlayWhenReady(true);
                     isPlaying = true;
                     updateNotification();
                 }
             } else if (ACTION_PAUSE.equals(action)) {
-                if (mediaPlayer != null) {
-                    mediaPlayer.pause();
+                if (exoPlayer != null) {
+                    exoPlayer.setPlayWhenReady(false);
                     isPlaying = false;
                     updateNotification();
                 }
@@ -138,24 +141,16 @@ public class MediaPlaybackService extends Service {
         try {
             stopAudio();
             currentVideoId = videoId != null ? videoId : "";
-            mediaPlayer.reset();
-            mediaPlayer.setOnErrorListener((mp, what, extra) -> {
-                Log.e("MoodFlow", "MediaPlayer error: what=" + what + " extra=" + extra);
-                sendBroadcast(new Intent("com.moodflow.app.media.AUDIO_ERROR")
-                        .setPackage(getPackageName()));
-                return true;
-            });
-            mediaPlayer.setOnPreparedListener(mp -> {
-                mediaPlayer.start();
-                isPlaying = true;
-                updateMetadata();
-                updateNotification();
-                sendBroadcast(new Intent("com.moodflow.app.media.AUDIO_STARTED")
-                        .setPackage(getPackageName()));
-            });
-            mediaPlayer.setDataSource(url);
-            mediaPlayer.prepareAsync();
-        } catch (IOException | IllegalStateException e) {
+            MediaItem mediaItem = MediaItem.fromUri(url);
+            exoPlayer.setMediaItem(mediaItem);
+            exoPlayer.prepare();
+            exoPlayer.setPlayWhenReady(true);
+            isPlaying = true;
+            updateMetadata();
+            updateNotification();
+            sendBroadcast(new Intent("com.moodflow.app.media.AUDIO_STARTED")
+                    .setPackage(getPackageName()));
+        } catch (Exception e) {
             Log.e("MoodFlow", "playAudioUrl failed", e);
             sendBroadcast(new Intent("com.moodflow.app.media.AUDIO_ERROR")
                     .setPackage(getPackageName()));
@@ -163,10 +158,9 @@ public class MediaPlaybackService extends Service {
     }
 
     private void stopAudio() {
-        if (mediaPlayer != null) {
+        if (exoPlayer != null) {
             try {
-                mediaPlayer.stop();
-                mediaPlayer.reset();
+                exoPlayer.stop();
             } catch (Exception ignored) {}
         }
         isPlaying = false;
@@ -175,11 +169,17 @@ public class MediaPlaybackService extends Service {
 
     private void updateMetadata() {
         try {
-            mediaSession.setMetadata(new MediaMetadata.Builder()
-                    .putString(MediaMetadata.METADATA_KEY_TITLE, currentTitle)
-                    .putString(MediaMetadata.METADATA_KEY_ARTIST, currentArtist)
-                    .putString(MediaMetadata.METADATA_KEY_MEDIA_ID, currentVideoId)
-                    .build());
+            androidx.media3.common.MediaMetadata.Builder metaBuilder =
+                new androidx.media3.common.MediaMetadata.Builder()
+                    .setTitle(currentTitle)
+                    .setArtist(currentArtist);
+            mediaSession.setMetadata(
+                new android.media.MediaMetadata.Builder()
+                    .putString(android.media.MediaMetadata.METADATA_KEY_TITLE, currentTitle)
+                    .putString(android.media.MediaMetadata.METADATA_KEY_ARTIST, currentArtist)
+                    .putString(android.media.MediaMetadata.METADATA_KEY_MEDIA_ID, currentVideoId)
+                    .build()
+            );
         } catch (Exception ignored) {}
     }
 
@@ -260,9 +260,9 @@ public class MediaPlaybackService extends Service {
 
     @Override
     public void onDestroy() {
-        if (mediaPlayer != null) {
-            try { mediaPlayer.release(); } catch (Exception ignored) {}
-            mediaPlayer = null;
+        if (exoPlayer != null) {
+            try { exoPlayer.release(); } catch (Exception ignored) {}
+            exoPlayer = null;
         }
         mediaSession.setActive(false);
         mediaSession.release();
