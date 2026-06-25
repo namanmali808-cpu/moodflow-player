@@ -1460,32 +1460,13 @@ function checkUpdate() {
 function doUpdate() {
   if(!updateInfo || !updateInfo.apkUrl) return;
   id('updateBtn').disabled = true;
-  id('updateBtn').textContent = '⏳ Downloading...';
-  // Try native bridge first (APK)
-  if(window.MediaBridge && window.MediaBridge.downloadApk) {
-    try {
-      window.MediaBridge.downloadApk(updateInfo.apkUrl);
-      id('updateBtn').textContent = '⬇ Download started... Check notification';
-      id('updateBtn').disabled = false;
-      return;
-    } catch(ex) {}
-  }
-  // Try Capacitor plugin (APK fallback)
-  try {
-    if(window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.AppUpdate) {
-      Capacitor.Plugins.AppUpdate.downloadAndInstall({ url: updateInfo.apkUrl }).then(function() {
-        id('updateBtn').textContent = '✅ Done! Install now.';
-        id('updateBtn').disabled = false;
-      }).catch(function(e) {
-        id('updateBtn').textContent = '⬇ Download';
-        id('updateBtn').disabled = false;
-        downloadFallback(updateInfo.apkUrl);
-      });
-      return;
-    }
-  } catch(ex) {}
-  // Web fallback: download APK
-  downloadFallback(updateInfo.apkUrl);
+  id('updateBtn').textContent = '⏳ Opening download...';
+  // Open GitHub releases page in browser - most reliable across all devices
+  var pageUrl = updateInfo.apkUrl.replace('/download/', '/releases/tag/').replace('/app-debug.apk', '');
+  window.open(pageUrl, '_blank');
+  id('updateBtn').textContent = '⬇ Tap retry';
+  id('updateBtn').disabled = false;
+  id('updateNotes').innerHTML = '<a href="' + pageUrl + '" target="_blank" style="color:#818cf8;font-size:16px;text-decoration:underline">Open GitHub Release v' + updateInfo.versionName + '</a><br><small style="color:#888">Tap app-debug.apk → Install</small>';
 }
 function downloadFallback(url) {
   id('updateBtn').textContent = '⏳ Downloading...';
