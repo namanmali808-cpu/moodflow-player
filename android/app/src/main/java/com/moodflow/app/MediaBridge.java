@@ -23,6 +23,9 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLDecoder;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MediaBridge {
 
@@ -43,6 +46,157 @@ public class MediaBridge {
         } catch (PackageManager.NameNotFoundException e) {
             return 0;
         }
+    }
+
+    // Fetches a playable audio URL from YouTube via Invidious or Piped API
+    @JavascriptInterface
+    public String getStreamUrl(String videoId) {
+        // Method 1: Invidious instances
+        String[] invidiousInstances = {
+            "https://invidious.snopyta.org",
+            "https://yewtu.be",
+            "https://inv.riverside.rocks",
+            "https://invidious.nerdvpn.de",
+            "https://inv.vern.cc",
+            "https://invidious.projectsegfau.lt",
+            "https://invidious.privacydev.net",
+            "https://inv.nadeko.net"
+        };
+        for (String base : invidiousInstances) {
+            try {
+                String result = fetchInvidious(base + "/api/v1/videos/" + videoId);
+                if (result != null) return result;
+            } catch (Exception ignored) {}
+        }
+
+        // Method 2: Piped instances
+        String[] pipedInstances = {
+            "https://pipedapi.kavin.rocks",
+            "https://piped-api.garudalinux.org",
+            "https://api.piped.privacydev.net",
+            "https://pipedapi.syncpundit.io",
+            "https://pipedapi.astrid.tech"
+        };
+        for (String base : pipedInstances) {
+            try {
+                String result = fetchPiped(base + "/streams/" + videoId);
+                if (result != null) return result;
+            } catch (Exception ignored) {}
+        }
+
+        return null;
+    }
+
+    private String fetchInvidious(String apiUrl) {
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL(apiUrl);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36");
+            conn.setConnectTimeout(8000);
+            conn.setReadTimeout(8000);
+            conn.connect();
+            if (conn.getResponseCode() != 200) return null;
+            String json = new BufferedReader(new InputStreamReader(conn.getInputStream()))
+                .lines().collect(java.util.stream.Collectors.joining("\n"));
+            // Find adaptiveFormats array
+            int afIdx = json.indexOf("\"adaptiveFormats\"");
+            if (afIdx < 0) return null;
+            int arrStart = json.indexOf("[", afIdx);
+            if (arrStart < 0) return null;
+            int depth = 0, arrEnd = -1;
+            for (int i = arrStart; i < json.length(); i++) {
+                char c = json.charAt(i);
+                if (c == '[') depth++;
+                else if (c == ']') { depth--; if (depth == 0) { arrEnd = i + 1; break; } }
+            }
+            if (arrEnd < 0) return null;
+            String arrContent = json.substring(arrStart, arrEnd);
+
+            // Find best audio format (m4a > webm)
+            Pattern urlP = Pattern.compile("\"url\"\\s*:\\s*\"([^\"]+)\"");
+            Pattern typeP = Pattern.compile("\"type\"\\s*:\\s*\"([^\"]+)\"");
+            Pattern bitrateP = Pattern.compile("\"bitrate\"\\s*:\\s*(\\d+)");
+            Matcher um = urlP.matcher(arrContent);
+            String bestUrl = null;
+            int bestScore = -1;
+            while (um.find()) {
+                String u = decodeJsonString(um.group(1));
+                int start = Math.max(0, um.start() - 300);
+                String ctxStr = arrContent.substring(start, um.start());
+                Matcher tm = typeP.matcher(ctxStr);
+                String mime = tm.find() ? tm.group(1) : "";
+                Matcher bm = bitrateP.matcher(ctxStr);
+                int bitrate = bm.find() ? Integer.parseInt(bm.group(1)) : 0;
+                int score = 0;
+                if (mime.contains("audio")) score += 100;
+                if (mime.contains("mp4")) score += 50;
+                score += bitrate;
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestUrl = u;
+                }
+            }
+            return bestUrl;
+        } catch (Exception e) {
+            Log.w(TAG, "Invidious failed: " + apiUrl, e);
+            return null;
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
+    private String fetchPiped(String apiUrl) {
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL(apiUrl);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36");
+            conn.setConnectTimeout(8000);
+            conn.setReadTimeout(8000);
+            conn.connect();
+            if (conn.getResponseCode() != 200) return null;
+            String json = new BufferedReader(new InputStreamReader(conn.getInputStream()))
+                .lines().collect(java.util.stream.Collectors.joining("\n"));
+            // Find audioStreams array
+            int audioIdx = json.indexOf("\"audioStreams\"");
+            if (audioIdx < 0) return null;
+            int arrStart = json.indexOf("[", audioIdx);
+            if (arrStart < 0) return null;
+            int depth = 0, arrEnd = -1;
+            for (int i = arrStart; i < json.length(); i++) {
+                char c = json.charAt(i);
+                if (c == '[') depth++;
+                else if (c == ']') { depth--; if (depth == 0) { arrEnd = i + 1; break; } }
+            }
+            if (arrEnd < 0) return null;
+            String arrContent = json.substring(arrStart, arrEnd);
+            Pattern urlP = Pattern.compile("\"url\"\\s*:\\s*\"([^\"]+)\"");
+            Pattern bitrateP = Pattern.compile("\"bitrate\"\\s*:\\s*(\\d+)");
+            Matcher um = urlP.matcher(arrContent);
+            String bestUrl = null;
+            int bestRate = -1;
+            while (um.find()) {
+                String u = decodeJsonString(um.group(1));
+                int start = Math.max(0, um.start() - 250);
+                Matcher bm = bitrateP.matcher(arrContent.substring(start, um.start()));
+                int rate = bm.find() ? Integer.parseInt(bm.group(1)) : 0;
+                if (rate > bestRate) {
+                    bestRate = rate;
+                    bestUrl = u;
+                }
+            }
+            return bestUrl;
+        } catch (Exception e) {
+            Log.w(TAG, "Piped failed: " + apiUrl, e);
+            return null;
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
+    private String decodeJsonString(String s) {
+        return s.replace("\\u0026", "&").replace("\\/", "/").replace("\\\\", "\\");
     }
 
     @JavascriptInterface
