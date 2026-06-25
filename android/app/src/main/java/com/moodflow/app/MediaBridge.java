@@ -42,11 +42,13 @@ public class MediaBridge {
         "https://invidious.snopyta.org", "https://yewtu.be", "https://inv.riverside.rocks",
         "https://invidious.nerdvpn.de", "https://inv.vern.cc", "https://invidious.projectsegfau.lt",
         "https://invidious.privacydev.net", "https://inv.nadeko.net", "https://inv.odyssey346.dev",
-        "https://yt.artemislena.eu", "https://invidious.fliegendewurst.eu", "https://invidious.weho.st"
+        "https://yt.artemislena.eu", "https://invidious.fliegendewurst.eu", "https://invidious.weho.st",
+        "https://invidious.jae.su", "https://invidious.001101.lu"
     };
     private static final String[] PIPED = {
         "https://pipedapi.kavin.rocks", "https://piped-api.garudalinux.org", "https://api.piped.privacydev.net",
-        "https://pipedapi.syncpundit.io", "https://pipedapi.astrid.tech", "https://piped.moomoo.me"
+        "https://pipedapi.syncpundit.io", "https://pipedapi.astrid.tech", "https://piped.moomoo.me",
+        "https://pipedapi.r4fo.com", "https://pipedapi.adminforge.de"
     };
     private static final ExecutorService pool = Executors.newCachedThreadPool();
 
@@ -75,7 +77,7 @@ public class MediaBridge {
             final String url = base + "/streams/" + videoId;
             futures.add(pool.submit(() -> fetchPiped(url)));
         }
-        long deadline = System.currentTimeMillis() + 6000;
+        long deadline = System.currentTimeMillis() + 10000;
         String result = null;
         try {
             while (System.currentTimeMillis() < deadline) {
@@ -99,10 +101,11 @@ public class MediaBridge {
             URL url = new URL(apiUrl);
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36");
-            conn.setConnectTimeout(3000);
-            conn.setReadTimeout(3000);
+            conn.setConnectTimeout(6000);
+            conn.setReadTimeout(6000);
             conn.connect();
             if (conn.getResponseCode() != 200) return null;
+            // Prefer m4a (mp4) audio - most compatible with WebView
             String json = new BufferedReader(new InputStreamReader(conn.getInputStream()))
                 .lines().collect(Collectors.joining("\n"));
             int afIdx = json.indexOf("\"adaptiveFormats\"");
@@ -133,8 +136,9 @@ public class MediaBridge {
                 int bitrate = bm.find() ? Integer.parseInt(bm.group(1)) : 0;
                 int score = 0;
                 if (mime.contains("audio")) score += 100;
-                if (mime.contains("mp4")) score += 50;
-                score += bitrate;
+                if (mime.contains("mp4") || mime.contains("m4a")) score += 200;
+                if (mime.contains("webm")) score += 50;
+                score += Math.min(bitrate / 1000, 100);
                 if (score > bestScore) { bestScore = score; bestUrl = u; }
             }
             return bestUrl;
@@ -148,10 +152,11 @@ public class MediaBridge {
             URL url = new URL(apiUrl);
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36");
-            conn.setConnectTimeout(3000);
-            conn.setReadTimeout(3000);
+            conn.setConnectTimeout(6000);
+            conn.setReadTimeout(6000);
             conn.connect();
             if (conn.getResponseCode() != 200) return null;
+            // Prefer m4a (mp4) audio - most compatible with WebView
             String json = new BufferedReader(new InputStreamReader(conn.getInputStream()))
                 .lines().collect(Collectors.joining("\n"));
             int audioIdx = json.indexOf("\"audioStreams\"");
@@ -168,14 +173,20 @@ public class MediaBridge {
             String arrContent = json.substring(arrStart, arrEnd);
             Pattern urlP = Pattern.compile("\"url\"\\s*:\\s*\"([^\"]+)\"");
             Pattern bitrateP = Pattern.compile("\"bitrate\"\\s*:\\s*(\\d+)");
+            Pattern mimeP = Pattern.compile("\"mimeType\"\\s*:\\s*\"([^\"]+)\"");
             Matcher um = urlP.matcher(arrContent);
             String bestUrl = null;
             int bestRate = -1;
             while (um.find()) {
                 String u = decodeJsonString(um.group(1));
                 int start = Math.max(0, um.start() - 250);
-                Matcher bm = bitrateP.matcher(arrContent.substring(start, um.start()));
+                String ctxStr = arrContent.substring(start, um.start());
+                Matcher bm = bitrateP.matcher(ctxStr);
                 int rate = bm.find() ? Integer.parseInt(bm.group(1)) : 0;
+                Matcher mm = mimeP.matcher(ctxStr);
+                String mime = mm.find() ? mm.group(1) : "";
+                // Prefer m4a over webm
+                if (mime.contains("mp4") || mime.contains("m4a")) rate += 100000;
                 if (rate > bestRate) { bestRate = rate; bestUrl = u; }
             }
             return bestUrl;
