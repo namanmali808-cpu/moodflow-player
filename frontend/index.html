@@ -567,24 +567,22 @@ function playSong(i) {
   updateMediaSession(s);
   startBackgroundService(s.id);
 
-  // Try streaming URL via Invidious/Piped API (Java, no CORS)
+  // Start YouTube iframe immediately (always works)
+  if (ytReady && player) {
+    usingAudio = false;
+    player.loadVideoById({videoId: s.id, startSeconds: hookStart ? HOOK_SECONDS : 0});
+    if (player.unMute) { player.unMute(); player.setVolume((id('volSlider') || {}).value || 80); }
+    txt('status', 'Playing');
+  }
+  // Try streaming URL via Invidious/Piped (enhancement, not required)
   getStreamUrl(s.id, function(url) {
-    if (url && url.length > 10) {
+    if (url && url.length > 10 && usingAudio === false) {
       usingAudio = true;
       audioPlayer.src = url;
       audioPlayer.volume = (id('volSlider') || {}).value / 100 || 0.8;
       audioPlayer.play();
-      txt('status', 'Playing');
-    } else if (ytReady && player) {
-      // Fallback: YouTube iframe
-      usingAudio = false;
-      player.loadVideoById({videoId: s.id, startSeconds: hookStart ? HOOK_SECONDS : 0});
-      setTimeout(function() {
-        if (player && player.unMute) {
-          player.unMute();
-          player.setVolume((id('volSlider') || {}).value || 80);
-        }
-      }, 200);
+      txt('status', 'Playing (stream)');
+      try { if (player) player.stopVideo(); } catch(e) {}
     }
   });
 
@@ -721,19 +719,6 @@ function updateMediaSession(song) {
     }
   } catch(ex) {}
 }
-function setupNativeMediaListeners() {
-  try {
-    if(window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.MediaControls) {
-      var mc = Capacitor.Plugins.MediaControls;
-      mc.addListener('mediaPlay', function(){ if(paused) { if(window.MediaBridge) window.MediaBridge.play(); else if(player) player.playVideo(); } });
-      mc.addListener('mediaPause', function(){ if(!paused) { if(window.MediaBridge) window.MediaBridge.pause(); else if(player) player.pauseVideo(); } });
-      mc.addListener('mediaNext', function(){ sk(); });
-      mc.addListener('mediaPrev', function(){ prv(); });
-    }
-  } catch(ex) {}
-}
-setupNativeMediaListeners();
-
 // Keep playback alive when screen locks / app backgrounds
 var bgTimer = null;
 function startBgWatch() {
@@ -914,7 +899,6 @@ function onYouTubeIframeAPIReady() {
               playing = true;
               txt('playBtn', '||');
               try { navigator.mediaSession.playbackState = 'playing'; } catch(ex) {}
-              nativeMedia('setPlaying', {playing: true});
               player.setVolume((id('volSlider') || {}).value || 80);
               if(buffTimer) { clearTimeout(buffTimer); buffTimer = null; }
               if(raf) clearTimeout(raf);
@@ -923,7 +907,6 @@ function onYouTubeIframeAPIReady() {
               playing = false;
               txt('playBtn', 'Play');
               try { navigator.mediaSession.playbackState = 'paused'; } catch(ex) {}
-              nativeMedia('setPlaying', {playing: false});
               if(buffTimer) { clearTimeout(buffTimer); buffTimer = null; }
               if(raf) { clearTimeout(raf); raf = null; }
             } else if(e.data === YT.PlayerState.ENDED) {
