@@ -1462,32 +1462,24 @@ function doUpdate() {
   id('updateBtn').disabled = true;
   id('updateBtn').textContent = '⏳ Downloading...';
   var apkUrl = updateInfo.apkUrl;
-  // Try to fetch APK from same origin (Firebase hosting) - no CORS issues
-  var localUrl = '/app-debug.apk';
-  fetch(localUrl).then(function(r) {
-    if(!r.ok) throw new Error('Not found');
-    return r.blob();
-  }).then(function(blob) {
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'MoodFlow.apk';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function() {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(a.href);
-    }, 2000);
-    id('updateBtn').textContent = '✅ Downloaded! Open file to install.';
-    id('updateBtn').disabled = false;
-  }).catch(function() {
-    // Fallback: try same-origin navigation
-    window.location.href = localUrl;
-    setTimeout(function(){
-      id('updateBtn').textContent = '⬇ Check notifications';
+  // Try Web Share API first
+  if(navigator.share) {
+    try {
+      navigator.share({ title: 'MoodFlow Update', url: apkUrl });
+      id('updateBtn').textContent = '⬇ Share to Chrome to download';
       id('updateBtn').disabled = false;
-      id('updateNotes').innerHTML = '<a href="' + localUrl + '" style="color:#818cf8;font-size:16px">📥 Tap to download APK</a>';
-    }, 2000);
-  });
+      id('updateNotes').innerHTML = 'Tap "Download APK v' + updateInfo.versionName + '" below if share failed:<br>' +
+        '<a href="' + apkUrl + '" style="color:#818cf8;font-size:16px">📥 Download APK v' + updateInfo.versionName + '</a>';
+      return;
+    } catch(e) {}
+  }
+  // Fallback: direct navigation to APK URL
+  window.location.href = apkUrl;
+  setTimeout(function(){
+    id('updateBtn').textContent = '⬇ Tap retry';
+    id('updateBtn').disabled = false;
+    id('updateNotes').innerHTML = '<a href="' + apkUrl + '" style="color:#818cf8;font-size:16px">📥 Download APK v' + updateInfo.versionName + '</a>';
+  }, 3000);
 }
 function downloadFallback(url) {
   id('updateBtn').textContent = '⏳ Downloading...';
