@@ -108,7 +108,7 @@ public class MediaBridge {
                 Thread.sleep(50);
             }
         } catch (Exception ignored) {}
-        executor.shutdownNow();
+        for (Future<String> f : futures) f.cancel(true);
         return result;
     }
 
