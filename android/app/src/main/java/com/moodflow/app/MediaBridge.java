@@ -95,6 +95,19 @@ public class MediaBridge {
         return result;
     }
 
+    @JavascriptInterface
+    public void getStreamUrlAsync(final String videoId) {
+        pool.submit(() -> {
+            String url = getStreamUrl(videoId);
+            if (url != null && !url.isEmpty()) {
+                webView.post(() -> {
+                    webView.evaluateJavascript(
+                        "onStreamUrlReady('" + url.replace("'", "\\'") + "','" + videoId + "')", null);
+                });
+            }
+        });
+    }
+
     private String fetchInvidious(String apiUrl) {
         HttpURLConnection conn = null;
         try {

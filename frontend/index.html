@@ -551,6 +551,18 @@ function getStreamUrl(vid, cb) {
   }
 }
 
+// Called asynchronously by Java bridge when streaming URL is ready
+function onStreamUrlReady(url, videoId) {
+  if (url && url.length > 10 && usingAudio === false && queue[queueIndex] && queue[queueIndex].id === videoId) {
+    usingAudio = true;
+    audioPlayer.src = url;
+    audioPlayer.volume = (id('volSlider') || {}).value / 100 || 0.8;
+    audioPlayer.play();
+    txt('status', 'Playing (stream)');
+    try { if (player) player.stopVideo(); } catch(e) {}
+  }
+}
+
 function playSong(i) {
   if(!queue.length) return;
   if (i >= queue.length) { queue = freshQueue(); i = 0; }
@@ -567,24 +579,28 @@ function playSong(i) {
   updateMediaSession(s);
   startBackgroundService(s.id);
 
-  // Start YouTube iframe immediately (always works)
+  // Start YouTube iframe immediately (always works - no blocking)
   if (ytReady && player) {
     usingAudio = false;
     player.loadVideoById({videoId: s.id, startSeconds: hookStart ? HOOK_SECONDS : 0});
     if (player.unMute) { player.unMute(); player.setVolume((id('volSlider') || {}).value || 80); }
     txt('status', 'Playing');
   }
-  // Try streaming URL via Invidious/Piped (enhancement, not required)
-  getStreamUrl(s.id, function(url) {
-    if (url && url.length > 10 && usingAudio === false) {
-      usingAudio = true;
-      audioPlayer.src = url;
-      audioPlayer.volume = (id('volSlider') || {}).value / 100 || 0.8;
-      audioPlayer.play();
-      txt('status', 'Playing (stream)');
-      try { if (player) player.stopVideo(); } catch(e) {}
-    }
-  });
+  // Request streaming URL asynchronously (doesn't block JS thread)
+  if (window.MediaBridge && window.MediaBridge.getStreamUrlAsync) {
+    window.MediaBridge.getStreamUrlAsync(s.id);
+  } else {
+    getStreamUrl(s.id, function(url) {
+      if (url && url.length > 10 && usingAudio === false) {
+        usingAudio = true;
+        audioPlayer.src = url;
+        audioPlayer.volume = (id('volSlider') || {}).value / 100 || 0.8;
+        audioPlayer.play();
+        txt('status', 'Playing (stream)');
+        try { if (player) player.stopVideo(); } catch(e) {}
+      }
+    });
+  }
 
   renderQueue();
   updateFavBtn(s.id);
