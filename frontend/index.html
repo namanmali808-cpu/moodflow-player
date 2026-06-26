@@ -888,6 +888,7 @@ function onYouTubeIframeAPIReady() {
         onReady: function() {
           ytReady = true;
           ytRetries = 0;
+          try { player.unMute(); } catch(e) {}
           player.setVolume((id('volSlider') || {}).value || 80);
           try { player.getIframe().setAttribute('allow', 'autoplay; fullscreen'); } catch(e) {}
           txt('status', 'Ready');
@@ -899,6 +900,7 @@ function onYouTubeIframeAPIReady() {
               playing = true;
               txt('playBtn', '||');
               try { navigator.mediaSession.playbackState = 'playing'; } catch(ex) {}
+              try { player.unMute(); } catch(ex) {}
               player.setVolume((id('volSlider') || {}).value || 80);
               if(buffTimer) { clearTimeout(buffTimer); buffTimer = null; }
               if(raf) clearTimeout(raf);
