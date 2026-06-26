@@ -541,6 +541,9 @@ function triggerBurst() {
 
 var audioPlayer = document.getElementById('audioPlayer');
 var usingAudio = false;
+var cachedStreamUrls = {};
+var nextAudio = document.createElement('audio');
+nextAudio.preload = 'auto';
 
 function getStreamUrl(vid, cb) {
   if (window.MediaBridge && window.MediaBridge.getStreamUrl) {
@@ -553,19 +556,41 @@ function getStreamUrl(vid, cb) {
 
 // Called asynchronously by Java bridge when streaming URL is ready
 function onStreamUrlReady(url, videoId) {
-  if (url && url.length > 10 && usingAudio === false && queue[queueIndex] && queue[queueIndex].id === videoId) {
-    // Don't switch if YouTube iframe is already playing smoothly
-    if (player && player.getPlayerState && player.getPlayerState() === YT.PlayerState.PLAYING) {
-      var cur = 0;
-      try { cur = player.getCurrentTime(); } catch(e) {}
-      if (cur > 3) return;
+  if (url && url.length > 10) {
+    cachedStreamUrls[videoId] = url;
+    // Pre-load if this is the next song in queue
+    if (queueIndex + 1 < queue.length && queue[queueIndex + 1].id === videoId) {
+      nextAudio.src = url;
+      nextAudio.load();
     }
-    usingAudio = true;
-    audioPlayer.src = url;
-    audioPlayer.volume = (id('volSlider') || {}).value / 100 || 0.8;
-    audioPlayer.play();
-    txt('status', 'Playing (stream)');
-    try { if (player) player.stopVideo(); } catch(e) {}
+    // Switch if this is current song and YT hasn't started yet
+    if (usingAudio === false && queue[queueIndex] && queue[queueIndex].id === videoId) {
+      if (player && player.getPlayerState && player.getPlayerState() === YT.PlayerState.PLAYING) {
+        var cur = 0;
+        try { cur = player.getCurrentTime(); } catch(e) {}
+        if (cur > 3) return;
+      }
+      usingAudio = true;
+      audioPlayer.src = url;
+      audioPlayer.volume = (id('volSlider') || {}).value / 100 || 0.8;
+      audioPlayer.play();
+      txt('status', 'Playing (stream)');
+      try { if (player) player.stopVideo(); } catch(e) {}
+    }
+  }
+}
+
+function preloadNext(i) {
+  if (i + 1 < queue.length) {
+    var nextId = queue[i + 1].id;
+    if (cachedStreamUrls[nextId]) {
+      nextAudio.src = cachedStreamUrls[nextId];
+      nextAudio.load();
+    } else if (window.MediaBridge && window.MediaBridge.getStreamUrlAsync) {
+      window.MediaBridge.getStreamUrlAsync(nextId);
+    } else {
+      getStreamUrl(nextId, function(url) { if (url) cachedStreamUrls[nextId] = url; });
+    }
   }
 }
 
@@ -585,7 +610,29 @@ function playSong(i) {
   updateMediaSession(s);
   startBackgroundService(s.id);
 
-  // Start YouTube iframe immediately (always works - no blocking)
+  // Use cached streaming URL if available (instant playback - no YT delay)
+  if (cachedStreamUrls[s.id]) {
+    usingAudio = true;
+    audioPlayer.src = cachedStreamUrls[s.id];
+    audioPlayer.currentTime = 0;
+    audioPlayer.volume = (id('volSlider') || {}).value / 100 || 0.8;
+    audioPlayer.play();
+    txt('status', 'Playing');
+    try { if (player) player.stopVideo(); } catch(e) {}
+    preloadNext(i);
+    renderQueue();
+    updateFavBtn(s.id);
+    var favB = id('favBtn');
+    if(favB) favB.style.display = '';
+    if(currentUser && firestoreDb) {
+      var update = {};
+      update['dailyPlays.' + todayStr() + '.' + s.id] = true;
+      firestoreDb.collection('users').doc(currentUser.uid).update(update).catch(function(){});
+    }
+    return;
+  }
+
+  // Start YouTube iframe immediately (no streaming URL cached yet)
   if (ytReady && player) {
     usingAudio = false;
     player.loadVideoById({videoId: s.id, startSeconds: hookStart ? HOOK_SECONDS : 0});
@@ -593,21 +640,25 @@ function playSong(i) {
     if (player.unMute) { player.unMute(); player.setVolume((id('volSlider') || {}).value || 80); }
     txt('status', 'Playing');
   }
-  // Request streaming URL asynchronously (doesn't block JS thread)
+  // Request streaming URL asynchronously + pre-fetch next song
   if (window.MediaBridge && window.MediaBridge.getStreamUrlAsync) {
     window.MediaBridge.getStreamUrlAsync(s.id);
   } else {
     getStreamUrl(s.id, function(url) {
-      if (url && url.length > 10 && usingAudio === false) {
-        usingAudio = true;
-        audioPlayer.src = url;
-        audioPlayer.volume = (id('volSlider') || {}).value / 100 || 0.8;
-        audioPlayer.play();
-        txt('status', 'Playing (stream)');
-        try { if (player) player.stopVideo(); } catch(e) {}
+      if (url && url.length > 10) {
+        cachedStreamUrls[s.id] = url;
+        if (usingAudio === false) {
+          usingAudio = true;
+          audioPlayer.src = url;
+          audioPlayer.volume = (id('volSlider') || {}).value / 100 || 0.8;
+          audioPlayer.play();
+          txt('status', 'Playing (stream)');
+          try { if (player) player.stopVideo(); } catch(e) {}
+        }
       }
     });
   }
+  preloadNext(i);
 
   renderQueue();
   updateFavBtn(s.id);

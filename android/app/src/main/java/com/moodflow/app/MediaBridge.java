@@ -68,13 +68,15 @@ public class MediaBridge {
 
     @JavascriptInterface
     public String getStreamUrl(String videoId) {
-        // Build URL list (all candidates)
+        // Try InnerTube (YouTube's own API) first - fast and reliable
+        String inner = fetchInnerTube(videoId);
+        if (inner != null && !inner.isEmpty()) return inner;
+        // Fallback: try Invidious/Piped in batches of 4
         List<String> urls = new ArrayList<>();
         for (String base : INVIDIOUS)
             urls.add(base + "/api/v1/videos/" + videoId);
         for (String base : PIPED)
             urls.add(base + "/streams/" + videoId);
-        // Try up to 4 at a time to avoid network congestion
         for (int i = 0; i < urls.size(); i += 4) {
             List<Future<String>> batch = new ArrayList<>();
             int end = Math.min(i + 4, urls.size());
@@ -103,11 +105,86 @@ public class MediaBridge {
         return null;
     }
 
+    private String fetchInnerTube(String videoId) {
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL("https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8");
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+            conn.setDoOutput(true);
+            String body = "{\"videoId\":\"" + videoId + "\",\"context\":{\"client\":{\"clientName\":\"WEB\",\"clientVersion\":\"2.20240101.00.00\"}}}";
+            conn.getOutputStream().write(body.getBytes("UTF-8"));
+            conn.connect();
+            if (conn.getResponseCode() != 200) {
+                Log.w(TAG, "InnerTube HTTP " + conn.getResponseCode() + " for " + videoId);
+                return null;
+            }
+            String json = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"))
+                .lines().collect(Collectors.joining("\n"));
+            // Parse adaptiveFormats for best audio-only stream
+            int afIdx = json.indexOf("\"adaptiveFormats\"");
+            if (afIdx < 0) return null;
+            int arrStart = json.indexOf("[", afIdx);
+            if (arrStart < 0) return null;
+            int depth = 0, arrEnd = -1;
+            for (int i = arrStart; i < json.length(); i++) {
+                char c = json.charAt(i);
+                if (c == '[') depth++;
+                else if (c == ']') { depth--; if (depth == 0) { arrEnd = i + 1; break; } }
+            }
+            if (arrEnd < 0) return null;
+            String arrContent = json.substring(arrStart, arrEnd);
+            Pattern urlP = Pattern.compile("\"url\"\\s*:\\s*\"([^\"]+)\"");
+            Pattern mimeP = Pattern.compile("\"mimeType\"\\s*:\\s*\"([^\"]+)\"");
+            Pattern bitrateP = Pattern.compile("\"bitrate\"\\s*:\\s*(\\d+)");
+            Pattern cipherP = Pattern.compile("\"signatureCipher\"\\s*:\\s*\"([^\"]+)\"");
+            String bestUrl = null;
+            int bestScore = -1;
+            Matcher um = urlP.matcher(arrContent);
+            while (um.find()) {
+                String u = decodeJsonString(um.group(1));
+                int start = Math.max(0, um.start() - 500);
+                String ctxStr = arrContent.substring(start, um.start());
+                Matcher mm = mimeP.matcher(ctxStr);
+                String mime = mm.find() ? mm.group(1) : "";
+                Matcher bm = bitrateP.matcher(ctxStr);
+                int bitrate = bm.find() ? Integer.parseInt(bm.group(1)) : 0;
+                int score = 0;
+                if (mime.contains("audio")) score += 100;
+                if (mime.contains("mp4") || mime.contains("m4a")) score += 200;
+                if (mime.contains("webm")) score += 50;
+                score += Math.min(bitrate / 1000, 100);
+                if (score > bestScore) { bestScore = score; bestUrl = u; }
+            }
+            if (bestUrl != null) {
+                Log.i(TAG, "InnerTube OK for " + videoId + " score=" + bestScore);
+                return bestUrl;
+            }
+            // Try signatureCipher as fallback
+            Matcher cm = cipherP.matcher(arrContent);
+            if (cm.find()) {
+                String cipher = cm.group(1);
+                // The cipher contains sp=sig&url=... or url=...&sp=sig
+                // We need to add the signature to the URL
+                // For simplicity, skip ciphers for now
+                Log.w(TAG, "InnerTube: cipher found (not implemented) for " + videoId);
+            }
+            return null;
+        } catch (Exception e) {
+            Log.w(TAG, "InnerTube failed for " + videoId + ": " + e.getMessage());
+            return null;
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
     @JavascriptInterface
     public void getStreamUrlAsync(final String videoId) {
         pool.submit(() -> {
-            // Wait 3s to let YouTube iframe start streaming first (no network contention)
-            try { Thread.sleep(3000); } catch (InterruptedException ignored) { return; }
             String url = getStreamUrl(videoId);
             if (url != null && !url.isEmpty()) {
                 webView.post(() -> {
