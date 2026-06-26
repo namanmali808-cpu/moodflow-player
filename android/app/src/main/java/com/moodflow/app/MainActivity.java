@@ -62,6 +62,11 @@ public class MainActivity extends BridgeActivity {
                 ws.setMediaPlaybackRequiresUserGesture(false);
                 ws.setJavaScriptEnabled(true);
                 ws.setDomStorageEnabled(true);
+                ws.setDatabaseEnabled(true);
+                ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+                ws.setAllowContentAccess(true);
+                ws.setLoadWithOverviewMode(true);
+                ws.setUseWideViewPort(true);
                 wv.addJavascriptInterface(new MediaBridge(MainActivity.this, wv), "MediaBridge");
                 return;
             }

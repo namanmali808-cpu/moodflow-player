@@ -67,7 +67,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 #micOv .b{background:linear-gradient(135deg,#818cf8,#a78bfa);width:104px;height:104px;border-radius:50%;display:flex;justify-content:center;align-items:center;font-size:44px;animation:pulse 1.3s ease-in-out infinite;box-shadow:0 0 80px rgba(129,140,248,.25),0 0 160px rgba(129,140,248,.1)}
 @keyframes pulse{0%{transform:scale(1);opacity:1}50%{transform:scale(1.06);opacity:.85}100%{transform:scale(1);opacity:1}}
 #micOv .tx{position:absolute;bottom:22%;color:rgba(255,255,255,.85);font-size:15px;text-align:center;width:80%;background:rgba(255,255,255,.06);padding:16px 20px;border-radius:18px;backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.04);box-shadow:0 4px 24px rgba(0,0,0,.2)}
-#ytWrap{position:absolute;left:-9999px;top:-9999px;width:400px;height:300px}
+#ytWrap{position:fixed;bottom:0;right:0;width:1px;height:1px;opacity:0.01;pointer-events:none;z-index:-1}
 .qi{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:12px;cursor:pointer;transition:all .15s;margin:2px 0}
 .qi:hover{background:rgba(255,255,255,.06)}
 .qi img{width:36px;height:27px;border-radius:6px;object-fit:cover;flex-shrink:0}
@@ -583,6 +583,7 @@ function playSong(i) {
   if (ytReady && player) {
     usingAudio = false;
     player.loadVideoById({videoId: s.id, startSeconds: hookStart ? HOOK_SECONDS : 0});
+    player.playVideo();
     if (player.unMute) { player.unMute(); player.setVolume((id('volSlider') || {}).value || 80); }
     txt('status', 'Playing');
   }

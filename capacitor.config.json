@@ -1,5 +1,8 @@
 {
   "appId": "com.moodflow.app",
   "appName": "MoodFlow",
-  "webDir": "frontend"
+  "webDir": "frontend",
+  "server": {
+    "url": "https://yt-mood-player-naman.web.app"
+  }
 }
