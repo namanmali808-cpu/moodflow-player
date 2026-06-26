@@ -68,36 +68,46 @@ public class MediaBridge {
 
     @JavascriptInterface
     public String getStreamUrl(String videoId) {
-        List<Future<String>> futures = new ArrayList<>();
-        for (String base : INVIDIOUS) {
-            final String url = base + "/api/v1/videos/" + videoId;
-            futures.add(pool.submit(() -> fetchInvidious(url)));
-        }
-        for (String base : PIPED) {
-            final String url = base + "/streams/" + videoId;
-            futures.add(pool.submit(() -> fetchPiped(url)));
-        }
-        long deadline = System.currentTimeMillis() + 10000;
-        String result = null;
-        try {
-            while (System.currentTimeMillis() < deadline) {
-                for (Future<String> f : futures) {
-                    if (f.isDone()) {
-                        String val = f.get();
-                        if (val != null && !val.isEmpty()) { result = val; break; }
-                    }
-                }
-                if (result != null) break;
-                Thread.sleep(50);
+        // Build URL list (all candidates)
+        List<String> urls = new ArrayList<>();
+        for (String base : INVIDIOUS)
+            urls.add(base + "/api/v1/videos/" + videoId);
+        for (String base : PIPED)
+            urls.add(base + "/streams/" + videoId);
+        // Try up to 4 at a time to avoid network congestion
+        for (int i = 0; i < urls.size(); i += 4) {
+            List<Future<String>> batch = new ArrayList<>();
+            int end = Math.min(i + 4, urls.size());
+            for (int j = i; j < end; j++) {
+                final String u = urls.get(j);
+                final boolean isInv = j < INVIDIOUS.length;
+                batch.add(pool.submit(() -> isInv ? fetchInvidious(u) : fetchPiped(u)));
             }
-        } catch (Exception ignored) {}
-        for (Future<String> f : futures) f.cancel(true);
-        return result;
+            long deadline = System.currentTimeMillis() + 2000;
+            String result = null;
+            try {
+                while (System.currentTimeMillis() < deadline) {
+                    for (Future<String> f : batch) {
+                        if (f.isDone()) {
+                            String val = f.get();
+                            if (val != null && !val.isEmpty()) { result = val; break; }
+                        }
+                    }
+                    if (result != null) break;
+                    Thread.sleep(50);
+                }
+            } catch (Exception ignored) {}
+            for (Future<String> f : batch) f.cancel(true);
+            if (result != null) return result;
+        }
+        return null;
     }
 
     @JavascriptInterface
     public void getStreamUrlAsync(final String videoId) {
         pool.submit(() -> {
+            // Wait 3s to let YouTube iframe start streaming first (no network contention)
+            try { Thread.sleep(3000); } catch (InterruptedException ignored) { return; }
             String url = getStreamUrl(videoId);
             if (url != null && !url.isEmpty()) {
                 webView.post(() -> {
@@ -114,8 +124,8 @@ public class MediaBridge {
             URL url = new URL(apiUrl);
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36");
-            conn.setConnectTimeout(6000);
-            conn.setReadTimeout(6000);
+            conn.setConnectTimeout(3000);
+            conn.setReadTimeout(3000);
             conn.connect();
             if (conn.getResponseCode() != 200) return null;
             // Prefer m4a (mp4) audio - most compatible with WebView
@@ -165,8 +175,8 @@ public class MediaBridge {
             URL url = new URL(apiUrl);
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36");
-            conn.setConnectTimeout(6000);
-            conn.setReadTimeout(6000);
+            conn.setConnectTimeout(3000);
+            conn.setReadTimeout(3000);
             conn.connect();
             if (conn.getResponseCode() != 200) return null;
             // Prefer m4a (mp4) audio - most compatible with WebView
