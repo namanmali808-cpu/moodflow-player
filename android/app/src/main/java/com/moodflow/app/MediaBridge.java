@@ -113,10 +113,14 @@ public class MediaBridge {
             conn.setRequestMethod("POST");
             conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
             conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("Origin", "https://www.youtube.com");
+            conn.setRequestProperty("Referer", "https://www.youtube.com/");
+            conn.setRequestProperty("X-YouTube-Client-Name", "1");
+            conn.setRequestProperty("X-YouTube-Client-Version", "2.20241201.00.00");
             conn.setConnectTimeout(5000);
             conn.setReadTimeout(5000);
             conn.setDoOutput(true);
-            String body = "{\"videoId\":\"" + videoId + "\",\"context\":{\"client\":{\"clientName\":\"WEB\",\"clientVersion\":\"2.20240101.00.00\"}}}";
+            String body = "{\"videoId\":\"" + videoId + "\",\"context\":{\"client\":{\"clientName\":\"WEB\",\"clientVersion\":\"2.20241201.00.00\"}},\"contentCheckOk\":true,\"racyCheckOk\":true}";
             conn.getOutputStream().write(body.getBytes("UTF-8"));
             conn.connect();
             if (conn.getResponseCode() != 200) {
@@ -125,7 +129,6 @@ public class MediaBridge {
             }
             String json = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"))
                 .lines().collect(Collectors.joining("\n"));
-            // Parse adaptiveFormats for best audio-only stream
             int afIdx = json.indexOf("\"adaptiveFormats\"");
             if (afIdx < 0) return null;
             int arrStart = json.indexOf("[", afIdx);
@@ -141,7 +144,6 @@ public class MediaBridge {
             Pattern urlP = Pattern.compile("\"url\"\\s*:\\s*\"([^\"]+)\"");
             Pattern mimeP = Pattern.compile("\"mimeType\"\\s*:\\s*\"([^\"]+)\"");
             Pattern bitrateP = Pattern.compile("\"bitrate\"\\s*:\\s*(\\d+)");
-            Pattern cipherP = Pattern.compile("\"signatureCipher\"\\s*:\\s*\"([^\"]+)\"");
             String bestUrl = null;
             int bestScore = -1;
             Matcher um = urlP.matcher(arrContent);
@@ -164,13 +166,10 @@ public class MediaBridge {
                 Log.i(TAG, "InnerTube OK for " + videoId + " score=" + bestScore);
                 return bestUrl;
             }
-            // Try signatureCipher as fallback
+            // Try signatureCipher field as fallback
+            Pattern cipherP = Pattern.compile("\"signatureCipher\"\\s*:\\s*\"([^\"]+)\"");
             Matcher cm = cipherP.matcher(arrContent);
             if (cm.find()) {
-                String cipher = cm.group(1);
-                // The cipher contains sp=sig&url=... or url=...&sp=sig
-                // We need to add the signature to the URL
-                // For simplicity, skip ciphers for now
                 Log.w(TAG, "InnerTube: cipher found (not implemented) for " + videoId);
             }
             return null;

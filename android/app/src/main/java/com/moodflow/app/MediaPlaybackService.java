@@ -6,46 +6,135 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
+import android.media.MediaMetadata;
+import android.media.session.MediaSession;
+import android.media.session.PlaybackState;
 import android.os.Build;
 import android.os.IBinder;
 
 import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
 
 public class MediaPlaybackService extends Service {
 
     private static final String CHANNEL_ID = "moodflow_media";
     private static final int NOTIF_ID = 1001;
 
+    static final String ACTION_START = "START";
+    static final String ACTION_STOP = "STOP";
+    static final String ACTION_UPDATE_META = "UPDATE_META";
+
+    private MediaSession mediaSession;
+    private String currentTitle = "MoodFlow";
+    private String currentArtist = "";
+    private boolean isPlaying = false;
+
     @Override
     public void onCreate() {
         super.onCreate();
-        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        createChannel();
+        setupMediaSession();
+        try { startForeground(NOTIF_ID, buildNotif()); } catch (Exception ignored) {}
+    }
+
+    private void createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel ch = new NotificationChannel(CHANNEL_ID, "MoodFlow Player",
+            NotificationChannel ch = new NotificationChannel(CHANNEL_ID, "MoodFlow",
                     NotificationManager.IMPORTANCE_LOW);
-            nm.createNotificationChannel(ch);
+            ch.setShowBadge(false);
+            ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+            getSystemService(NotificationManager.class).createNotificationChannel(ch);
         }
+    }
+
+    private void setupMediaSession() {
         try {
-            startForeground(NOTIF_ID, buildNotification());
+            mediaSession = new MediaSession(this, "MoodFlow");
+            mediaSession.setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS | MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS);
+            mediaSession.setCallback(new MediaSession.Callback() {
+                @Override public void onPlay() { broadcastAction("com.moodflow.app.media.PLAY"); }
+                @Override public void onPause() { broadcastAction("com.moodflow.app.media.PAUSE"); }
+                @Override public void onSkipToNext() { broadcastAction("com.moodflow.app.media.NEXT"); }
+                @Override public void onSkipToPrevious() { broadcastAction("com.moodflow.app.media.PREV"); }
+            });
+            mediaSession.setActive(true);
+            updatePlaybackState();
         } catch (Exception ignored) {}
     }
 
-    private Notification buildNotification() {
+    private void broadcastAction(String action) {
+        try { sendBroadcast(new Intent(action)); } catch (Exception ignored) {}
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null) {
+            String action = intent.getAction();
+            if (ACTION_STOP.equals(action)) {
+                stopSelf();
+            } else if (ACTION_UPDATE_META.equals(action)) {
+                String t = intent.getStringExtra("title");
+                String a = intent.getStringExtra("artist");
+                boolean p = intent.getBooleanExtra("playing", false);
+                if (t != null) currentTitle = t;
+                if (a != null) currentArtist = a;
+                isPlaying = p;
+                updateMetadata();
+                updatePlaybackState();
+            }
+        }
+        try { NotificationManagerCompat.from(this).notify(NOTIF_ID, buildNotif()); } catch (Exception ignored) {}
+        return START_STICKY;
+    }
+
+    private void updateMetadata() {
+        if (mediaSession == null) return;
+        try {
+            mediaSession.setMetadata(new MediaMetadata.Builder()
+                .putString(MediaMetadata.METADATA_KEY_TITLE, currentTitle)
+                .putString(MediaMetadata.METADATA_KEY_ARTIST, currentArtist)
+                .build());
+        } catch (Exception ignored) {}
+    }
+
+    private void updatePlaybackState() {
+        if (mediaSession == null) return;
+        try {
+            int state = isPlaying ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED;
+            long actions = PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE |
+                           PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS |
+                           PlaybackState.ACTION_STOP;
+            mediaSession.setPlaybackState(new PlaybackState.Builder()
+                .setActions(actions).setState(state, PlaybackState.PLAYBACK_POSITION_UNKNOWN, 1.0f).build());
+        } catch (Exception ignored) {}
+    }
+
+    private Notification buildNotif() {
         Intent launchIntent = getPackageManager().getLaunchIntentForPackage(getPackageName());
         PendingIntent contentIntent = PendingIntent.getActivity(this, 0, launchIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         return new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_media_play)
-                .setContentTitle("MoodFlow")
-                .setContentText("Playing")
-                .setContentIntent(contentIntent).setOngoing(true).setShowWhen(false)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC).setSilent(true).build();
+                .setContentTitle(currentTitle)
+                .setContentText(currentArtist)
+                .setContentIntent(contentIntent)
+                .setOngoing(true).setShowWhen(false)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setSilent(true)
+                .addAction(notifAction(2, android.R.drawable.ic_media_previous, "Previous", "com.moodflow.app.media.PREV"))
+                .addAction(notifAction(3,
+                    isPlaying ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
+                    isPlaying ? "Pause" : "Play",
+                    isPlaying ? "com.moodflow.app.media.PAUSE" : "com.moodflow.app.media.PLAY"))
+                .addAction(notifAction(4, android.R.drawable.ic_media_next, "Next", "com.moodflow.app.media.NEXT"))
+                .build();
     }
 
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        return START_STICKY;
+    private NotificationCompat.Action notifAction(int reqCode, int icon, String title, String action) {
+        Intent i = new Intent(action);
+        PendingIntent pi = PendingIntent.getBroadcast(this, reqCode, i,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        return new NotificationCompat.Action(icon, title, pi);
     }
 
     @Override
@@ -53,6 +142,13 @@ public class MediaPlaybackService extends Service {
 
     @Override
     public void onDestroy() {
+        try {
+            if (mediaSession != null) {
+                mediaSession.setActive(false);
+                mediaSession.release();
+                mediaSession = null;
+            }
+        } catch (Exception ignored) {}
         try { stopForeground(true); } catch (Exception ignored) {}
         super.onDestroy();
     }
