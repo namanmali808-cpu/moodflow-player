@@ -57,10 +57,10 @@ public class MediaPlaybackService extends Service {
             mediaSession = new MediaSession(this, "MoodFlow");
             mediaSession.setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS | MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS);
             mediaSession.setCallback(new MediaSession.Callback() {
-                @Override public void onPlay() { execJs("if(window.mediaOnPlay)mediaOnPlay();"); }
-                @Override public void onPause() { execJs("if(window.mediaOnPause)mediaOnPause();"); }
-                @Override public void onSkipToNext() { execJs("if(window.mediaOnNext)mediaOnNext();"); }
-                @Override public void onSkipToPrevious() { execJs("if(window.mediaOnPrev)mediaOnPrev();"); }
+                @Override public void onPlay() { broadcastAction("com.moodflow.app.media.PLAY"); }
+                @Override public void onPause() { broadcastAction("com.moodflow.app.media.PAUSE"); }
+                @Override public void onSkipToNext() { broadcastAction("com.moodflow.app.media.NEXT"); }
+                @Override public void onSkipToPrevious() { broadcastAction("com.moodflow.app.media.PREV"); }
             });
             mediaSession.setActive(true);
             updatePlaybackState();
@@ -69,14 +69,8 @@ public class MediaPlaybackService extends Service {
         }
     }
 
-    private void execJs(String js) {
-        try {
-            if (MediaControlsPlugin.webViewRef != null) {
-                MediaControlsPlugin.webViewRef.post(() -> {
-                    try { MediaControlsPlugin.webViewRef.evaluateJavascript(js, null); } catch (Exception ignored) {}
-                });
-            }
-        } catch (Exception ignored) {}
+    private void broadcastAction(String action) {
+        try { sendBroadcast(new Intent(action).setPackage(getPackageName())); } catch (Exception ignored) {}
     }
 
     @Override
@@ -85,14 +79,6 @@ public class MediaPlaybackService extends Service {
             String action = intent.getAction();
             if (ACTION_STOP.equals(action)) {
                 stopSelf();
-            } else if (ACTION_PLAY.equals(action)) {
-                execJs("if(window.mediaOnPlay)mediaOnPlay();");
-            } else if (ACTION_PAUSE.equals(action)) {
-                execJs("if(window.mediaOnPause)mediaOnPause();");
-            } else if (ACTION_NEXT.equals(action)) {
-                execJs("if(window.mediaOnNext)mediaOnNext();");
-            } else if (ACTION_PREV.equals(action)) {
-                execJs("if(window.mediaOnPrev)mediaOnPrev();");
             } else if (ACTION_UPDATE_META.equals(action)) {
                 String t = intent.getStringExtra("title");
                 String a = intent.getStringExtra("artist");
@@ -152,9 +138,9 @@ public class MediaPlaybackService extends Service {
     }
 
     private NotificationCompat.Action notifAction(int reqCode, int icon, String title, String action) {
-        Intent i = new Intent(this, MediaPlaybackService.class);
-        i.setAction(action);
-        PendingIntent pi = PendingIntent.getService(this, reqCode, i,
+        Intent i = new Intent(action);
+        i.setPackage(getPackageName());
+        PendingIntent pi = PendingIntent.getBroadcast(this, reqCode, i,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         return new NotificationCompat.Action(icon, title, pi);
     }

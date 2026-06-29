@@ -50,6 +50,8 @@ public class MediaControlsPlugin extends Plugin {
 
         requestNotifPermission();
 
+        // Re-register on reload to refresh webViewRef
+        try { getContext().getApplicationContext().unregisterReceiver(forwardReceiver); } catch (Exception ignored) {}
         IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_PLAY);
         filter.addAction(ACTION_PAUSE);
@@ -59,7 +61,7 @@ public class MediaControlsPlugin extends Plugin {
         filter.addAction(AUDIO_STARTED);
         int flags = 0;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) flags = Context.RECEIVER_NOT_EXPORTED;
-        getContext().registerReceiver(forwardReceiver, filter, flags);
+        getContext().getApplicationContext().registerReceiver(forwardReceiver, filter, flags);
     }
 
     private void requestNotifPermission() {
@@ -83,9 +85,11 @@ public class MediaControlsPlugin extends Plugin {
             else if (ACTION_PREV.equals(a)) js = "if(window.mediaOnPrev)mediaOnPrev();";
             else if (SONG_ENDED.equals(a)) js = "if(window.sk)sk();";
             else if (AUDIO_STARTED.equals(a)) js = "if(window.onNativeAudioStart)onNativeAudioStart();";
-            if (js != null && webView != null) {
+            if (js == null) return;
+            WebView wv = webViewRef != null ? webViewRef : webView;
+            if (wv != null) {
                 final String fjs = js;
-                webView.post(() -> webView.evaluateJavascript(fjs, null));
+                wv.post(() -> { try { wv.evaluateJavascript(fjs, null); } catch (Exception ignored) {} });
             }
         }
     };
