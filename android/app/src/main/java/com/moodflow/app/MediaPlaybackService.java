@@ -12,6 +12,7 @@ import android.media.session.PlaybackState;
 import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
+import android.webkit.WebView;
 
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
@@ -57,10 +58,10 @@ public class MediaPlaybackService extends Service {
             mediaSession = new MediaSession(this, "MoodFlow");
             mediaSession.setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS | MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS);
             mediaSession.setCallback(new MediaSession.Callback() {
-                @Override public void onPlay() { broadcastAction("com.moodflow.app.media.PLAY"); }
-                @Override public void onPause() { broadcastAction("com.moodflow.app.media.PAUSE"); }
-                @Override public void onSkipToNext() { broadcastAction("com.moodflow.app.media.NEXT"); }
-                @Override public void onSkipToPrevious() { broadcastAction("com.moodflow.app.media.PREV"); }
+                @Override public void onPlay() { execJs("if(window.mediaOnPlay)mediaOnPlay();"); }
+                @Override public void onPause() { execJs("if(window.mediaOnPause)mediaOnPause();"); }
+                @Override public void onSkipToNext() { execJs("if(window.mediaOnNext)mediaOnNext();"); }
+                @Override public void onSkipToPrevious() { execJs("if(window.mediaOnPrev)mediaOnPrev();"); }
             });
             mediaSession.setActive(true);
             updatePlaybackState();
@@ -69,8 +70,13 @@ public class MediaPlaybackService extends Service {
         }
     }
 
-    private void broadcastAction(String action) {
-        try { sendBroadcast(new Intent(action).setPackage(getPackageName())); } catch (Exception ignored) {}
+    private void execJs(String js) {
+        WebView wv = MediaControlsPlugin.webViewRef;
+        if (wv != null) {
+            try { wv.evaluateJavascript(js, null); } catch (Exception e1) {
+                try { wv.post(() -> wv.evaluateJavascript(js, null)); } catch (Exception ignored) {}
+            }
+        }
     }
 
     @Override
