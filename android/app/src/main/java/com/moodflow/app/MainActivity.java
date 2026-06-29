@@ -77,7 +77,7 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    private void requestNotifPermission() {
+    public void requestNotifPermission() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return;
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                 == PackageManager.PERMISSION_GRANTED) return;
