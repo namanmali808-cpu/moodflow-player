@@ -1425,8 +1425,12 @@ function updateMenuSub() {
 }
 
 setTimeout(function() {
-  if(currentUser) checkUpdate();
+  checkUpdate();
 }, 3000);
+// Retry update check after auth too
+setTimeout(function() {
+  if(currentUser) checkUpdate();
+}, 8000);
 
 function loadUserData(uid) {
   if(!firestoreDb) { txt('status', 'Firestore not ready'); return; }
