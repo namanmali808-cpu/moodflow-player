@@ -6,16 +6,15 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
+import android.media.MediaMetadata;
+import android.media.session.MediaSession;
+import android.media.session.PlaybackState;
 import android.os.Build;
 import android.os.IBinder;
+import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
-import androidx.media.app.NotificationCompat.MediaStyle;
-import androidx.media.session.MediaSessionCompat;
-import androidx.media.session.PlaybackStateCompat;
-import androidx.media.MediaMetadataCompat;
-import android.util.Log;
 
 public class MediaPlaybackService extends Service {
 
@@ -26,7 +25,7 @@ public class MediaPlaybackService extends Service {
     static final String ACTION_STOP = "STOP";
     static final String ACTION_UPDATE_META = "UPDATE_META";
 
-    private MediaSessionCompat mediaSession;
+    private MediaSession mediaSession;
     private String currentTitle = "MoodFlow";
     private String currentArtist = "";
     private boolean isPlaying = false;
@@ -51,10 +50,9 @@ public class MediaPlaybackService extends Service {
 
     private void setupMediaSession() {
         try {
-            mediaSession = new MediaSessionCompat(this, "MoodFlow");
-            mediaSession.setFlags(MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS |
-                                  MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS);
-            mediaSession.setCallback(new MediaSessionCompat.Callback() {
+            mediaSession = new MediaSession(this, "MoodFlow");
+            mediaSession.setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS | MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS);
+            mediaSession.setCallback(new MediaSession.Callback() {
                 @Override public void onPlay() { broadcastAction("com.moodflow.app.media.PLAY"); }
                 @Override public void onPause() { broadcastAction("com.moodflow.app.media.PAUSE"); }
                 @Override public void onSkipToNext() { broadcastAction("com.moodflow.app.media.NEXT"); }
@@ -63,7 +61,7 @@ public class MediaPlaybackService extends Service {
             mediaSession.setActive(true);
             updatePlaybackState();
         } catch (Exception e) {
-            Log.w("MoodFlow", "MediaSession setup failed", e);
+            Log.w("MoodFlow", "MediaSession failed", e);
         }
     }
 
@@ -84,6 +82,7 @@ public class MediaPlaybackService extends Service {
                 if (t != null) currentTitle = t;
                 if (a != null) currentArtist = a;
                 isPlaying = p;
+                updateMetadata();
                 updatePlaybackState();
             }
         }
@@ -91,19 +90,25 @@ public class MediaPlaybackService extends Service {
         return START_STICKY;
     }
 
+    private void updateMetadata() {
+        if (mediaSession == null) return;
+        try {
+            mediaSession.setMetadata(new MediaMetadata.Builder()
+                .putString(MediaMetadata.METADATA_KEY_TITLE, currentTitle)
+                .putString(MediaMetadata.METADATA_KEY_ARTIST, currentArtist)
+                .build());
+        } catch (Exception ignored) {}
+    }
+
     private void updatePlaybackState() {
         if (mediaSession == null) return;
         try {
-            int state = isPlaying ? PlaybackStateCompat.STATE_PLAYING : PlaybackStateCompat.STATE_PAUSED;
-            long actions = PlaybackStateCompat.ACTION_PLAY | PlaybackStateCompat.ACTION_PAUSE |
-                           PlaybackStateCompat.ACTION_SKIP_TO_NEXT | PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS |
-                           PlaybackStateCompat.ACTION_STOP;
-            mediaSession.setPlaybackState(new PlaybackStateCompat.Builder()
-                .setActions(actions).setState(state, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1.0f).build());
-            mediaSession.setMetadata(new MediaMetadataCompat.Builder()
-                .putString(MediaMetadataCompat.METADATA_KEY_TITLE, currentTitle)
-                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, currentArtist)
-                .build());
+            int state = isPlaying ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED;
+            long actions = PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE |
+                           PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS |
+                           PlaybackState.ACTION_STOP;
+            mediaSession.setPlaybackState(new PlaybackState.Builder()
+                .setActions(actions).setState(state, PlaybackState.PLAYBACK_POSITION_UNKNOWN, 1.0f).build());
         } catch (Exception ignored) {}
     }
 
@@ -119,9 +124,6 @@ public class MediaPlaybackService extends Service {
                 .setOngoing(true).setShowWhen(false)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setSilent(true)
-                .setStyle(new MediaStyle()
-                    .setMediaSession(mediaSession != null ? mediaSession.getSessionToken() : null)
-                    .setShowActionsInCompactView(0, 1, 2))
                 .addAction(notifAction(2, android.R.drawable.ic_media_previous, "Previous", "com.moodflow.app.media.PREV"))
                 .addAction(notifAction(3,
                     isPlaying ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
