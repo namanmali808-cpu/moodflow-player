@@ -87,10 +87,14 @@ public class MediaControlsPlugin extends Plugin {
             else if (AUDIO_STARTED.equals(a)) js = "if(window.onNativeAudioStart)onNativeAudioStart();";
             if (js == null) return;
             WebView wv = webViewRef != null ? webViewRef : webView;
-            if (wv != null) {
-                final String fjs = js;
-                wv.post(() -> { try { wv.evaluateJavascript(fjs, null); } catch (Exception ignored) {} });
-            }
+            if (wv == null) return;
+            final String fjs = js;
+            // Try direct evaluateJavascript first
+            try { wv.evaluateJavascript(fjs, null); return; } catch (Exception ignored) {}
+            // Fallback: post to WebView thread
+            try { wv.post(() -> { try { wv.evaluateJavascript(fjs, null); } catch (Exception ignored) {} }); return; } catch (Exception ignored) {}
+            // Final fallback: loadUrl javascript:
+            try { wv.post(() -> { try { wv.loadUrl("javascript:" + fjs); } catch (Exception ignored) {} }); } catch (Exception ignored) {}
         }
     };
 

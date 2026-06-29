@@ -72,11 +72,13 @@ public class MediaPlaybackService extends Service {
 
     private void execJs(String js) {
         WebView wv = MediaControlsPlugin.webViewRef;
-        if (wv != null) {
-            try { wv.evaluateJavascript(js, null); } catch (Exception e1) {
-                try { wv.post(() -> wv.evaluateJavascript(js, null)); } catch (Exception ignored) {}
-            }
-        }
+        if (wv == null) return;
+        // Try evaluateJavascript first (fast, returns result)
+        try { wv.evaluateJavascript(js, null); return; } catch (Exception ignored) {}
+        // Fallback: post to WebView thread
+        try { wv.post(() -> { try { wv.evaluateJavascript(js, null); } catch (Exception ignored) {} }); return; } catch (Exception ignored) {}
+        // Final fallback: loadUrl (works even when WebView is in background/throttled state)
+        try { wv.post(() -> { try { wv.loadUrl("javascript:" + js); } catch (Exception ignored) {} }); } catch (Exception ignored) {}
     }
 
     @Override
