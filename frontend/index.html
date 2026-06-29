@@ -1560,7 +1560,7 @@ var updateInfo = null;
 
 function getAppVersion() {
   try { if(window.MediaBridge && window.MediaBridge.getVersionCode) return window.MediaBridge.getVersionCode(); } catch(e) {}
-  return APP_VERSION;
+  return 0; // webapp mode → always show update
 }
 
 function checkUpdate() {
