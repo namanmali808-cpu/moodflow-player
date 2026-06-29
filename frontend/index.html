@@ -1562,8 +1562,17 @@ function checkUpdate() {
         if(d.versionCode && d.versionCode > getAppVersion() && d.apkUrl) {
           updateInfo = d;
           show('updateScrn', 'flex');
-          txt('updateVersion', 'v' + d.versionName + ' available');
+          txt('updateVersion', '⬇ Auto-updating to v' + d.versionName);
           txt('updateNotes', d.releaseNotes || 'Bug fixes & improvements');
+          // Auto-download via native bridge (background download + notification)
+          if(window.MediaBridge && window.MediaBridge.downloadApk) {
+            window.MediaBridge.downloadApk(d.apkUrl);
+            id('updateBtn').textContent = '⏳ Auto-downloading...';
+            id('updateBtn').disabled = true;
+          } else {
+            id('updateBtn').textContent = '⬇ Download v' + d.versionName;
+            id('updateBtn').disabled = false;
+          }
         }
       }
     }).catch(function() {});
@@ -1572,21 +1581,17 @@ function checkUpdate() {
 
 function doUpdate() {
   if(!updateInfo || !updateInfo.apkUrl) return;
+  var apkUrl = updateInfo.apkUrl;
+  // Use native bridge for background download + install notification
+  if(window.MediaBridge && window.MediaBridge.downloadApk) {
+    id('updateBtn').textContent = '⏳ Downloading...';
+    id('updateBtn').disabled = true;
+    window.MediaBridge.downloadApk(apkUrl);
+    return;
+  }
+  // Fallback for webapp: direct navigation
   id('updateBtn').disabled = true;
   id('updateBtn').textContent = '⏳ Downloading...';
-  var apkUrl = updateInfo.apkUrl;
-  // Try Web Share API first
-  if(navigator.share) {
-    try {
-      navigator.share({ title: 'MoodFlow Update', url: apkUrl });
-      id('updateBtn').textContent = '⬇ Share to Chrome to download';
-      id('updateBtn').disabled = false;
-      id('updateNotes').innerHTML = 'Tap "Download APK v' + updateInfo.versionName + '" below if share failed:<br>' +
-        '<a href="' + apkUrl + '" style="color:#818cf8;font-size:16px">📥 Download APK v' + updateInfo.versionName + '</a>';
-      return;
-    } catch(e) {}
-  }
-  // Fallback: direct navigation to APK URL
   window.location.href = apkUrl;
   setTimeout(function(){
     id('updateBtn').textContent = '⬇ Tap retry';
