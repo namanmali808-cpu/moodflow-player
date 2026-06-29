@@ -44,6 +44,8 @@ public class MainActivity extends BridgeActivity {
             if (wv != null) {
                 wv.onResume();
                 wv.resumeTimers();
+                // Force switch from YouTube iframe to streaming URL for background playback
+                wv.evaluateJavascript("if(window.forceSwitchToStream)forceSwitchToStream();", null);
             }
         } catch (Exception ignored) {}
     }

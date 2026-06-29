@@ -807,6 +807,33 @@ function mediaOnPause() { if (usingAudio) { audioPlayer.pause(); } else if(playe
 function mediaOnNext() { sk(); }
 function mediaOnPrev() { if(queueIndex > 0) playSong(queueIndex - 1); else if(queue.length) playSong(0); }
 // Keep playback alive when screen locks / app backgrounds
+// Override Page Visibility API - YouTube checks this to auto-pause
+try {
+  var _defProp = Object.defineProperty;
+  _defProp(document, 'hidden', { get: function() { return false; }, configurable: true });
+  _defProp(document, 'webkitHidden', { get: function() { return false; }, configurable: true });
+  _defProp(document, 'visibilityState', { get: function() { return 'visible'; }, configurable: true });
+  _defProp(document, 'webkitVisibilityState', { get: function() { return 'visible'; }, configurable: true });
+} catch(e) {}
+// Force switch from YouTube iframe to streaming URL (for zero-delay background)
+function forceSwitchToStream() {
+  if(usingAudio || !queue[queueIndex]) return;
+  var id = queue[queueIndex].id;
+  if(cachedStreamUrls[id]) {
+    usingAudio = true;
+    audioPlayer.src = cachedStreamUrls[id];
+    audioPlayer.volume = (id('volSlider') || {}).value / 100 || 0.8;
+    audioPlayer.currentTime = 0;
+    audioPlayer.play();
+    txt('status', 'Playing (background)');
+    try { if(player) player.stopVideo(); } catch(e) {}
+  } else {
+    // Request streaming URL now
+    if(window.MediaBridge && window.MediaBridge.getStreamUrlAsync) {
+      window.MediaBridge.getStreamUrlAsync(id);
+    }
+  }
+}
 var bgTimer = null;
 function startBgWatch() {
   stopBgWatch();
@@ -820,10 +847,11 @@ function startBgWatch() {
   }, 2000);
 }
 function stopBgWatch() { if(bgTimer) { clearInterval(bgTimer); bgTimer = null; } }
+// Also try to force-switch when visibility changes
 document.addEventListener('visibilitychange', function(){
-  if(document.hidden) startBgWatch();
-  else stopBgWatch();
-});
+  if(document.hidden) { startBgWatch(); forceSwitchToStream(); }
+  else { stopBgWatch(); }
+}, true);
 
 function toggleFav() {
   var s = queue[queueIndex];
