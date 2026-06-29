@@ -801,6 +801,11 @@ function updateMediaSession(song) {
     }
   } catch(ex) {}
 }
+// Callbacks for native notification / lock screen buttons
+function mediaOnPlay() { if (usingAudio) { audioPlayer.play(); } else if(player) player.playVideo(); }
+function mediaOnPause() { if (usingAudio) { audioPlayer.pause(); } else if(player) player.pauseVideo(); }
+function mediaOnNext() { sk(); }
+function mediaOnPrev() { if(queueIndex > 0) playSong(queueIndex - 1); else if(queue.length) playSong(0); }
 // Keep playback alive when screen locks / app backgrounds
 var bgTimer = null;
 function startBgWatch() {

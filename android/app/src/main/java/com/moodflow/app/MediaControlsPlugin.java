@@ -30,6 +30,8 @@ public class MediaControlsPlugin extends Plugin {
 
     private boolean permissionRequested = false;
     private WebView webView;
+    
+    public static WebView webViewRef = null;
 
     @Override
     protected void handleOnPause() {
@@ -44,7 +46,7 @@ public class MediaControlsPlugin extends Plugin {
     @Override
     public void load() {
         super.load();
-        try { webView = getBridge().getWebView(); } catch (Exception ignored) {}
+        try { webView = getBridge().getWebView(); webViewRef = webView; } catch (Exception ignored) {}
 
         requestNotifPermission();
 
