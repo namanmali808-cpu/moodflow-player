@@ -1,6 +1,6 @@
 {
   "versionCode": 16,
-  "versionName": "1.8.0",
-  "apkUrl": "https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.8.0/app-debug.apk",
+  "versionName": "1.8.1",
+  "apkUrl": "https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.8.1/app-debug.apk",
   "releaseNotes": "Complete rewrite - Mood & Language queue system, Firebase auth, favorites sync, voice control, premium subscription ready"
 }
