@@ -319,7 +319,7 @@ setTimeout(()=>search('bollywood hits trending 2026'),300);
 
 // ===== UPDATE CHECK =====
 fetch('https://raw.githubusercontent.com/namanmali808-cpu/moodflow-player/main/version.json').then(r=>r.json()).then(d=>{
-  if(d.version&&d.version!=='1.8.3'&&d.apkUrl)setTimeout(()=>{
+  if(d.version&&d.version!=='1.8.4'&&d.apkUrl)setTimeout(()=>{
     if(confirm('Update v'+d.version+' available. Download?')){try{if(window.MediaBridge)window.MediaBridge.downloadApk(d.apkUrl);else window.open(d.apkUrl,'_system')}catch(e){}}
   },8000);
 }).catch(()=>{});

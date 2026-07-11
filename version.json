@@ -1,6 +1,6 @@
 {
-  "version": "1.8.3",
-  "versionCode": 57,
-  "apkUrl": "https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.8.3/app-debug.apk",
+  "version": "1.8.4",
+  "versionCode": 58,
+  "apkUrl": "https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.8.4/app-debug.apk",
   "releaseNotes": "Simple working music player - search, mood chips, play"
 }
