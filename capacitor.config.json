@@ -2,7 +2,28 @@
   "appId": "com.moodflow.app",
   "appName": "MoodFlow",
   "webDir": "frontend",
+  "bundledWebRuntime": false,
   "server": {
-    "url": "https://yt-mood-player-naman.web.app"
+    "androidScheme": "https",
+    "url": "https://yt-mood-player-naman.web.app",
+    "allowNavigation": [
+      "*.youtube.com",
+      "*.googlevideo.com",
+      "*.pipedapi.com",
+      "*.invidio.us",
+      "raw.githubusercontent.com",
+      "yt-mood-player-naman.web.app"
+    ]
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#08080f"
+    }
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": true
   }
 }
