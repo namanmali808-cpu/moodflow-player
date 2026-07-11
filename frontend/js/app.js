@@ -135,7 +135,7 @@ async function checkForUpdates() {
   try {
     const res = await fetch('https://raw.githubusercontent.com/namanmali808-cpu/moodflow-player/main/version.json');
     const data = await res.json();
-    const currentVer = '1.2.0';
+    const currentVer = '1.8.0';
     if (data.version !== currentVer) {
       showToast(`Update available: ${data.version}`);
       setTimeout(() => {
