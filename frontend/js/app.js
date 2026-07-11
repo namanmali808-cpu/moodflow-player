@@ -1,5 +1,4 @@
 function $(id) { return document.getElementById(id); }
-
 function showScreen(id) { $(id)?.classList.remove('hidden'); }
 function hideScreen(id) { $(id)?.classList.add('hidden'); }
 
@@ -15,44 +14,30 @@ function showToast(msg) {
 function openSidebar() { $('sidebar')?.classList.add('open'); }
 function closeSidebar() { $('sidebar')?.classList.remove('open'); }
 
-function forceHideSplash() {
-  const splash = $('splash');
-  if (splash && !splash.classList.contains('hidden')) {
-    splash.classList.add('hidden');
-    if (!currentUser && $('auth-screen')) showScreen('auth-screen');
-    if ($('main-screen')) showScreen('main-screen');
-  }
-}
-
 document.addEventListener('DOMContentLoaded', () => {
+  // Force hide splash immediately on first paint
+  requestAnimationFrame(() => {
+    hideScreen('splash');
+    showScreen('main-screen');
+  });
+
+  // Safety fallback
+  setTimeout(() => { hideScreen('splash'); showScreen('main-screen'); }, 500);
+  setTimeout(() => { hideScreen('splash'); showScreen('main-screen'); }, 2000);
+
   try {
-    // Force-hide splash after max 3 seconds regardless of errors
-    setTimeout(forceHideSplash, 3000);
-
-    // Normal splash transition
-    setTimeout(() => {
-      try {
-        hideScreen('splash');
-        if (!currentUser) {
-          showScreen('auth-screen');
-        } else {
-          showScreen('main-screen');
-        }
-      } catch(e) { forceHideSplash(); }
-    }, 1500);
-
     initAuth();
-    initVoice();
-  } catch(e) { forceHideSplash(); }
+    FirebasePlugin.init();
+  } catch(e) {}
+
+  try { initVoice(); } catch(e) {}
 
   try {
     $('auth-form')?.addEventListener('submit', handleAuth);
     $('auth-toggle-link')?.addEventListener('click', (e) => { e.preventDefault(); toggleAuthMode(); });
-    $('skip-auth-btn')?.addEventListener('click', () => {
-      hideScreen('auth-screen');
-      showScreen('main-screen');
-    });
+    $('skip-auth-btn')?.addEventListener('click', () => { hideScreen('auth-screen'); showScreen('main-screen'); });
   } catch(e) {}
+
   try {
     $('menu-btn')?.addEventListener('click', openSidebar);
     $('sidebar-close')?.addEventListener('click', closeSidebar);
@@ -64,11 +49,13 @@ document.addEventListener('DOMContentLoaded', () => {
       closeSidebar();
     });
   } catch(e) {}
+
   try {
     $('search-btn')?.addEventListener('click', () => performSearch($('search-input')?.value));
     $('search-input')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') performSearch($('search-input')?.value); });
     $('voice-search-btn')?.addEventListener('click', toggleVoiceSearch);
   } catch(e) {}
+
   try {
     $('mini-play-pause')?.addEventListener('click', togglePlayPause);
     $('mini-next')?.addEventListener('click', playNext);
@@ -81,6 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
       switchScreen('queue');
     });
   } catch(e) {}
+
   try {
     document.querySelectorAll('.mood-card').forEach(card => {
       card.addEventListener('click', () => {
@@ -97,6 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   } catch(e) {}
+
   try {
     $('clear-queue-btn')?.addEventListener('click', clearQueue);
     $('subscribe-btn')?.addEventListener('click', handleSubscribe);
@@ -113,10 +102,7 @@ function updateGreeting() {
   const el = $('welcome-text');
   if (!el) return;
   const h = new Date().getHours();
-  let greeting = 'Good evening';
-  if (h < 12) greeting = 'Good morning';
-  else if (h < 17) greeting = 'Good afternoon';
-  el.textContent = greeting;
+  el.textContent = (h < 12) ? 'Good morning' : (h < 17) ? 'Good afternoon' : 'Good evening';
 }
 
 async function performSearch(query) {
@@ -127,30 +113,26 @@ async function performSearch(query) {
   container.innerHTML = '<div class="loader" style="margin:2rem auto;"></div>';
   const results = await searchYouTube(query.trim());
   window._searchResults = results;
-  if (!results?.length) {
-    container.innerHTML = '<p class="text-muted">No results found. Try a different search.</p>';
-    return;
-  }
-  container.innerHTML = results.map((track, i) => createTrackItem(track, i)).join('');
+  container.innerHTML = results?.length
+    ? results.map((track, i) => createTrackItem(track, i)).join('')
+    : '<p class="text-muted">No results found. Try a different search.</p>';
 }
 
 async function checkForUpdates() {
   try {
     const res = await fetch('https://raw.githubusercontent.com/namanmali808-cpu/moodflow-player/main/version.json');
     const data = await res.json();
-    const currentVer = '1.8.1';
-    if (data.version !== currentVer && data.apkUrl) {
+    if (data.version !== '1.8.1' && data.apkUrl) {
       setTimeout(() => {
         if (confirm('Update ' + data.version + ' available. Download?')) {
           try {
             if (window.MediaBridge) window.MediaBridge.downloadApk(data.apkUrl);
-            else if (window.MoodFlowBridge) window.MoodFlowBridge.downloadUpdate(data.apkUrl);
             else window.open(data.apkUrl, '_system');
           } catch(e) { showToast('Open update page to download'); }
         }
       }, 3000);
     }
-  } catch(e) { /* update check failed */ }
+  } catch(e) {}
 }
 
 window.addEventListener('offline', () => showToast('No internet connection'));
