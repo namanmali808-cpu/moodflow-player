@@ -319,7 +319,7 @@ function initFirebase(){
 
 // Auto-update
 fetch('https://raw.githubusercontent.com/namanmali808-cpu/moodflow-player/main/version.json').then(r=>r.json()).then(d=>{
-  if(d.version!=='1.8.2'&&d.apkUrl)setTimeout(()=>{
+  if(d.version!=='1.8.3'&&d.apkUrl)setTimeout(()=>{
     if(confirm('Update '+d.version+' available. Download?')){try{if(window.MediaBridge)window.MediaBridge.downloadApk(d.apkUrl);else window.open(d.apkUrl,'_system')}catch(e){}}
   },5000);
 }).catch(()=>{});
