@@ -108,13 +108,19 @@ public class MediaPlaybackService extends Service {
                 @Override public void onPlay() {
                     new Handler(Looper.getMainLooper()).post(() -> {
                         if (mediaPlayer != null) { resumePlayback(); }
-                        else { execJs("if(window.mediaOnPlay)mediaOnPlay();"); }
+                        else {
+                            execJs("if(window.mediaOnPlay)mediaOnPlay();");
+                            syncStateWithWebView();
+                        }
                     });
                 }
                 @Override public void onPause() {
                     new Handler(Looper.getMainLooper()).post(() -> {
                         if (mediaPlayer != null) { pausePlayback(); }
-                        else { execJs("if(window.mediaOnPause)mediaOnPause();"); }
+                        else {
+                            execJs("if(window.mediaOnPause)mediaOnPause();");
+                            syncStateWithWebView();
+                        }
                     });
                 }
                 @Override public void onSkipToNext() {
@@ -220,6 +226,10 @@ public class MediaPlaybackService extends Service {
         try { wv.post(() -> { try { wv.evaluateJavascript(js, null); } catch (Exception ignored) {} }); } catch (Exception ignored) {}
     }
 
+    private void syncStateWithWebView() {
+        execJs("if(window.syncPlaying)syncPlaying(" + isPlaying + ");");
+    }
+
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null) {
@@ -239,10 +249,16 @@ public class MediaPlaybackService extends Service {
                 updatePlaybackState();
             } else if (ACTION_PLAY.equals(action)) {
                 if (mediaPlayer != null) { resumePlayback(); }
-                else { execJs("if(window.mediaOnPlay)mediaOnPlay();"); }
+                else {
+                    execJs("if(window.mediaOnPlay)mediaOnPlay();");
+                    syncStateWithWebView();
+                }
             } else if (ACTION_PAUSE.equals(action)) {
                 if (mediaPlayer != null) { pausePlayback(); }
-                else { execJs("if(window.mediaOnPause)mediaOnPause();"); }
+                else {
+                    execJs("if(window.mediaOnPause)mediaOnPause();");
+                    syncStateWithWebView();
+                }
             } else if (ACTION_PLAY_STREAM.equals(action)) {
                 String url = intent.getStringExtra("url");
                 if (url != null) playStream(url);

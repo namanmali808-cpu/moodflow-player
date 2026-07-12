@@ -616,20 +616,54 @@ function playSong(i) {
   var th = id('thumb');
   if(th) { th.src = 'https://img.youtube.com/vi/' + s.id + '/mqdefault.jpg'; th.style.display = 'block'; }
   paused = false; playing = true; txt('playBtn', '||');
-  updateMediaSession(s);
   startBackgroundService(s.id);
   nativePlaying = false;
+  var gotNative = false;
 
-  // Use cached streaming URL if available (instant playback - no YT delay)
-  if (cachedStreamUrls[s.id]) {
+  // 1) Try to get streaming URL immediately and create native player
+  if (window.MediaBridge && window.MediaBridge.getStreamUrl) {
+    try {
+      var immUrl = window.MediaBridge.getStreamUrl(s.id);
+      if (immUrl && immUrl.length > 10) {
+        cachedStreamUrls[s.id] = immUrl;
+        usingAudio = true;
+        audioPlayer.src = immUrl;
+        audioPlayer.currentTime = 0;
+        audioPlayer.volume = (id('volSlider') || {}).value / 100 || 0.8;
+        audioPlayer.play();
+        txt('status', 'Playing');
+        try { if (window.MediaBridge.playStreamingUrl) window.MediaBridge.playStreamingUrl(immUrl); } catch(e) {}
+        try { if (player) player.stopVideo(); } catch(e) {}
+        gotNative = true;
+        preloadNext(i);
+        updateMediaSession(s);
+        renderQueue();
+        updateFavBtn(s.id);
+        var favB = id('favBtn');
+        if(favB) favB.style.display = '';
+        if(currentUser && firestoreDb) {
+          var update = {};
+          update['dailyPlays.' + todayStr() + '.' + s.id] = true;
+          firestoreDb.collection('users').doc(currentUser.uid).update(update).catch(function(){});
+        }
+        return;
+      }
+    } catch(e) {}
+  }
+
+  // 2) Cached URL available but sync fetch failed or not available
+  if (cachedStreamUrls[s.id] && !gotNative) {
     usingAudio = true;
     audioPlayer.src = cachedStreamUrls[s.id];
     audioPlayer.currentTime = 0;
     audioPlayer.volume = (id('volSlider') || {}).value / 100 || 0.8;
     audioPlayer.play();
     txt('status', 'Playing');
+    try { if (window.MediaBridge.playStreamingUrl) window.MediaBridge.playStreamingUrl(cachedStreamUrls[s.id]); } catch(e) {}
     try { if (player) player.stopVideo(); } catch(e) {}
+    gotNative = true;
     preloadNext(i);
+    updateMediaSession(s);
     renderQueue();
     updateFavBtn(s.id);
     var favB = id('favBtn');
@@ -642,7 +676,8 @@ function playSong(i) {
     return;
   }
 
-  // Start YouTube iframe immediately (no streaming URL cached yet)
+  // 3) No streaming URL yet - start YouTube iframe for immediate audio
+  updateMediaSession(s);
   if (ytReady && player) {
     usingAudio = false;
     player.loadVideoById({videoId: s.id, startSeconds: hookStart ? HOOK_SECONDS : 0});
@@ -650,7 +685,7 @@ function playSong(i) {
     if (player.unMute) { player.unMute(); player.setVolume((id('volSlider') || {}).value || 80); }
     txt('status', 'Playing');
   }
-  // Request streaming URL asynchronously + pre-fetch next song
+  // 4) Request streaming URL asynchronously for native player
   if (window.MediaBridge && window.MediaBridge.getStreamUrlAsync) {
     window.MediaBridge.getStreamUrlAsync(s.id);
   } else {
@@ -663,13 +698,13 @@ function playSong(i) {
           audioPlayer.volume = (id('volSlider') || {}).value / 100 || 0.8;
           audioPlayer.play();
           txt('status', 'Playing (stream)');
+          try { if (window.MediaBridge.playStreamingUrl) window.MediaBridge.playStreamingUrl(url); } catch(e) {}
           try { if (player) player.stopVideo(); } catch(e) {}
         }
       }
     });
   }
   preloadNext(i);
-
   renderQueue();
   updateFavBtn(s.id);
   var favB = id('favBtn');
@@ -838,9 +873,8 @@ function mediaOnPause() {
   if (usingAudio) { audioPlayer.pause(); } else if(player) player.pauseVideo();
   syncPlaying(false);
 }
-function mediaOnNext() { sk(); }
+function mediaOnNext() { if (sk) sk(); }
 function mediaOnPrev() { if(queueIndex > 0) playSong(queueIndex - 1); else if(queue.length) playSong(0); }
-function sk() { mediaOnNext(); }
 // Keep playback alive when screen locks / app backgrounds
 // Override Page Visibility API - YouTube checks this to auto-pause
 try {
@@ -1152,24 +1186,27 @@ if(pw) {
   pw.addEventListener('touchend', seekEnd);
 }
 
-var swX = 0, swT = 0;
-var cardEl = id('mainApp') ? document.querySelector('.card') : null;
-if(cardEl) {
-  cardEl.addEventListener('touchstart', function(e) {
-    if(e.target.closest('#progW')) return;
-    swX = e.changedTouches[0].screenX;
-    swT = Date.now();
-  }, {passive:true});
-  cardEl.addEventListener('touchend', function(e) {
-    if(e.target.closest('#progW')) return;
-    if(!swX) return;
-    var dx = e.changedTouches[0].screenX - swX;
-    var dt = Date.now() - swT;
-    if(dt > 500) { swX = 0; return; }
-    if(dx > 60) prv();
-    else if(dx < -60) sk();
-    swX = 0;
-  }, {passive:true});
+function setupSwipe() {
+  try {
+    var el = document.querySelector('.card');
+    if (!el) return;
+    var sx = 0, st = 0;
+    el.addEventListener('touchstart', function(e) {
+      if (e.target.closest('#progW')) return;
+      sx = e.touches[0].screenX;
+      st = Date.now();
+    }, {passive: true});
+    el.addEventListener('touchend', function(e) {
+      if (e.target.closest('#progW')) return;
+      if (!sx) return;
+      var dx = e.changedTouches[0].screenX - sx;
+      var dt = Date.now() - st;
+      sx = 0;
+      if (dt > 400) return;
+      if (dx > 50) { prv(); return; }
+      if (dx < -50) { sk(); }
+    }, {passive: true});
+  } catch(ex) {}
 }
 
 function toggleMic() {
@@ -1298,6 +1335,7 @@ document.addEventListener('DOMContentLoaded', function() {
     firestoreDb = firebase.firestore();
   } catch(e) { txt('authNote', 'Firebase init error: ' + e.message); }
 
+  setTimeout(setupSwipe, 2000);
   if(firebaseAuth) {
     firebaseAuth.onAuthStateChanged(function(user) {
       try {
@@ -1554,8 +1592,8 @@ function loadUserData(uid) {
       startTrial(uid);
     }
     setPremium();
-    show('mainApp', 'block');
-  }).catch(function() { show('mainApp', 'block'); txt('status', 'Error loading data'); });
+    show('mainApp', 'block'); setupSwipe();
+  }).catch(function() { show('mainApp', 'block'); setTimeout(setupSwipe,100); txt('status', 'Error loading data'); });
 }
 
 function startTrial(uid) {
@@ -1571,7 +1609,7 @@ function startTrial(uid) {
     show('subScrn', 'none');
     txt('status', 'Free trial started! Enjoy 28 days.');
     setPremium();
-    show('mainApp', 'block');
+    show('mainApp', 'block'); setupSwipe();
   });
 }
 
