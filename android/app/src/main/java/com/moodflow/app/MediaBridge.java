@@ -38,6 +38,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class MediaBridge {
+    public static MediaBridge instance;
 
     private static final String TAG = "MoodFlowBridge";
     private Context ctx;
@@ -60,6 +61,7 @@ public class MediaBridge {
     public MediaBridge(Context context, WebView wv) {
         this.ctx = context;
         this.webView = wv;
+        instance = this;
     }
 
     @JavascriptInterface
@@ -390,6 +392,7 @@ public class MediaBridge {
     public void startBgService(String videoId) {
         Intent intent = new Intent(ctx, MediaPlaybackService.class);
         intent.setAction("START");
+        intent.putExtra("videoId", videoId);
         startService(intent);
     }
 

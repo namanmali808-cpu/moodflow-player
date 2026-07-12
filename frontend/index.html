@@ -195,7 +195,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
     <div style="font-size:14px;opacity:.65;margin-bottom:18px" id="updateNotes"></div>
     <div id="updateProgress" style="font-size:12px;opacity:.4;margin-bottom:10px;display:none">Downloading...</div>
     <button id="updateBtn" onclick="doUpdate()" style="width:100%;padding:15px;border:none;border-radius:16px;font-size:15px;font-weight:700;color:#fff;cursor:pointer;background:linear-gradient(135deg,#818cf8,#a78bfa);transition:all .25s;box-shadow:0 4px 16px rgba(129,140,248,.2);display:flex;align-items:center;justify-content:center;gap:6px">⬇ Download Update</button>
-    <button id="updateLater" onclick="closeUpdate()" style="width:100%;padding:14px;border:none;border-radius:16px;font-size:13px;font-weight:600;color:rgba(255,255,255,.35);cursor:pointer;background:transparent;margin-top:6px;transition:all .2s">Later</button>
   </div>
 </div>
 
@@ -1186,28 +1185,24 @@ if(pw) {
   pw.addEventListener('touchend', seekEnd);
 }
 
-function setupSwipe() {
-  try {
-    var el = document.querySelector('.card');
-    if (!el) return;
-    var sx = 0, st = 0;
-    el.addEventListener('touchstart', function(e) {
-      if (e.target.closest('#progW')) return;
-      sx = e.touches[0].screenX;
-      st = Date.now();
-    }, {passive: true});
-    el.addEventListener('touchend', function(e) {
-      if (e.target.closest('#progW')) return;
-      if (!sx) return;
-      var dx = e.changedTouches[0].screenX - sx;
-      var dt = Date.now() - st;
-      sx = 0;
-      if (dt > 400) return;
-      if (dx > 50) { prv(); return; }
-      if (dx < -50) { sk(); }
-    }, {passive: true});
-  } catch(ex) {}
-}
+var _sx = 0, _st = 0;
+document.addEventListener('touchstart', function(e) {
+  if (!e.target.closest('.card')) return;
+  if (e.target.closest('#progW')) return;
+  _sx = e.touches[0].screenX;
+  _st = Date.now();
+}, {passive: true});
+document.addEventListener('touchend', function(e) {
+  if (!_sx) return;
+  if (!e.target.closest('.card')) return;
+  if (e.target.closest('#progW')) return;
+  var dx = e.changedTouches[0].screenX - _sx;
+  var dt = Date.now() - _st;
+  _sx = 0;
+  if (dt > 400) return;
+  if (dx > 50) { prv(); return; }
+  if (dx < -50) { sk(); }
+}, {passive: true});
 
 function toggleMic() {
   if(micOn) {

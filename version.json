@@ -1,1 +1,1 @@
-{"version":"1.8.7","apkUrl":"https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.8.7/MoodFlow-v1.8.7.apk","notes":"FIX: Notification play/pause when app minimized/locked. FIX: Swipe gesture for prev/next song. Auto-update works."}
+{"version":"1.8.8","apkUrl":"https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.8.8/MoodFlow-v1.8.8.apk","notes":"FIX: Swipe gesture works. FIX: Notification play/pause when app minimized. Removed 'Later' button."}

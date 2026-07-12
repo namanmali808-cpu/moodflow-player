@@ -51,6 +51,8 @@ public class MediaPlaybackService extends Service {
 
     private MediaPlayer mediaPlayer;
     private String streamUrl;
+    private String lastVideoId;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     @Override
     public void onCreate() {
@@ -111,6 +113,7 @@ public class MediaPlaybackService extends Service {
                         else {
                             execJs("if(window.mediaOnPlay)mediaOnPlay();");
                             syncStateWithWebView();
+                            if (lastVideoId != null) fetchStreamForCurrentVideo();
                         }
                     });
                 }
@@ -240,18 +243,27 @@ public class MediaPlaybackService extends Service {
             } else if (ACTION_UPDATE_META.equals(action)) {
                 String t = intent.getStringExtra("title");
                 String a = intent.getStringExtra("artist");
+                String vid = intent.getStringExtra("videoId");
                 boolean p = intent.getBooleanExtra("playing", false);
                 if (t != null) currentTitle = t;
                 if (a != null) currentArtist = a;
+                if (vid != null && !vid.isEmpty()) lastVideoId = vid;
                 isPlaying = p;
                 if (isPlaying) { acquireWakeLock(); } else { releaseWakeLock(); }
                 updateMetadata();
                 updatePlaybackState();
+            } else if (ACTION_START.equals(action)) {
+                String vid = intent.getStringExtra("videoId");
+                if (vid != null && !vid.isEmpty()) lastVideoId = vid;
+                if (mediaPlayer == null && lastVideoId != null) {
+                    fetchStreamForCurrentVideo();
+                }
             } else if (ACTION_PLAY.equals(action)) {
                 if (mediaPlayer != null) { resumePlayback(); }
                 else {
                     execJs("if(window.mediaOnPlay)mediaOnPlay();");
                     syncStateWithWebView();
+                    if (lastVideoId != null) fetchStreamForCurrentVideo();
                 }
             } else if (ACTION_PAUSE.equals(action)) {
                 if (mediaPlayer != null) { pausePlayback(); }
@@ -348,6 +360,20 @@ public class MediaPlaybackService extends Service {
             pi = PendingIntent.getService(this, reqCode, i, flags);
         }
         return new NotificationCompat.Action(icon, title, pi);
+    }
+
+    private void fetchStreamForCurrentVideo() {
+        if (lastVideoId == null || mediaPlayer != null) return;
+        new Thread(() -> {
+            try {
+                if (MediaBridge.instance == null) return;
+                String url = MediaBridge.instance.getStreamUrl(lastVideoId);
+                if (url != null && !url.isEmpty()) {
+                    final String fUrl = url;
+                    mainHandler.post(() -> playStream(fUrl));
+                }
+            } catch (Exception ignored) {}
+        }).start();
     }
 
     @Override
