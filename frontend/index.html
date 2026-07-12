@@ -193,11 +193,11 @@ function playTrack(track){
   $('pa').textContent=track.artist;
   updateUI();
   updateMediaSession(track);
-  
-  $('st').textContent='Loading...';
+  $('st').textContent='Loading stream...';
   
   getStream(track.id).then(function(u){
     if(!u){err('Cannot get stream');playing=false;updateUI();return}
+    $('st').textContent='Starting playback...';
     nativePlaying=false;
     var hasNative=false;
     try{
@@ -218,8 +218,12 @@ function playTrack(track){
           if(queue.length>1)nextTrack()
         };
       }
-      try{audio.src=u;audio.play()}catch(e){err('Play failed')}
+      try{audio.src=u;audio.play();$('st').textContent='Playing'}catch(e){err('Play failed')}
+    }else{
+      $('st').textContent='Playing (native)'
     }
+  }).catch(function(e){
+    err('Failed to load: '+(e.message||'unknown'))
   });
 }
 

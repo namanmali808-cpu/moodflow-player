@@ -1,1 +1,1 @@
-{"version":"1.9.1","apkUrl":"https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.9.1/MoodFlow-v1.9.1.apk","notes":"Complete rewrite - buttons, swipe, native-first playback, simplified update, service resilience"}
+{"version":"1.9.2","apkUrl":"https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.9.2/MoodFlow-v1.9.2.apk","notes":"FIX: Promise catch added, toast on error, status messages"}
