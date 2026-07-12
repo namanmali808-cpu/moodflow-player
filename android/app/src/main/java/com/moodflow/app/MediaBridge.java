@@ -9,9 +9,13 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.speech.RecognitionListener;
+import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
 import android.util.Log;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
@@ -57,6 +61,110 @@ public class MediaBridge {
         "https://pipedapi.r4fo.com", "https://pipedapi.adminforge.de"
     };
     private static final ExecutorService pool = Executors.newCachedThreadPool();
+
+    private SpeechRecognizer speechRecognizer;
+    private boolean speechRecognitionActive = false;
+
+    @JavascriptInterface
+    public void startVoiceRecognition() {
+        if (speechRecognitionActive) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (ctx.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                if (ctx instanceof MainActivity) {
+                    ((MainActivity) ctx).requestRecordAudioPermission();
+                }
+                webView.post(() -> webView.evaluateJavascript(
+                    "onVoiceError('Microphone permission required. Tap mic again after granting.')", null));
+                return;
+            }
+        }
+        if (!SpeechRecognizer.isRecognitionAvailable(ctx)) {
+            webView.post(() -> webView.evaluateJavascript(
+                "onVoiceError('Speech recognition not available on this device')", null));
+            return;
+        }
+        try {
+            if (speechRecognizer != null) {
+                speechRecognizer.destroy();
+                speechRecognizer = null;
+            }
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(ctx);
+            speechRecognizer.setRecognitionListener(new RecognitionListener() {
+                @Override public void onReadyForSpeech(Bundle params) {
+                    Log.i(TAG, "Voice: ready");
+                    webView.post(() -> webView.evaluateJavascript("onVoiceReady()", null));
+                }
+                @Override public void onBeginningOfSpeech() {
+                    Log.i(TAG, "Voice: beginning");
+                }
+                @Override public void onRmsChanged(float rmsdB) {}
+                @Override public void onBufferReceived(byte[] buffer) {}
+                @Override public void onEndOfSpeech() {
+                    Log.i(TAG, "Voice: end");
+                }
+                @Override public void onError(int error) {
+                    speechRecognitionActive = false;
+                    String msg;
+                    switch (error) {
+                        case SpeechRecognizer.ERROR_NO_MATCH: msg = "No speech detected. Try again."; break;
+                        case SpeechRecognizer.ERROR_SPEECH_TIMEOUT: msg = "No speech detected. Try again."; break;
+                        case SpeechRecognizer.ERROR_RECOGNIZER_BUSY: msg = "Speech recognizer busy. Try again."; break;
+                        case SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS: msg = "Microphone permission denied."; break;
+                        case SpeechRecognizer.ERROR_NETWORK: msg = "Network error during voice recognition."; break;
+                        case SpeechRecognizer.ERROR_AUDIO: msg = "Audio error during recording."; break;
+                        case SpeechRecognizer.ERROR_CLIENT: msg = "Voice recognition client error."; break;
+                        default: msg = "Voice recognition error (" + error + ")"; break;
+                    }
+                    Log.e(TAG, "Voice error: " + error + " " + msg);
+                    final String fMsg = msg;
+                    webView.post(() -> webView.evaluateJavascript(
+                        "onVoiceError('" + fMsg.replace("'", "\\'") + "')", null));
+                }
+                @Override public void onResults(Bundle results) {
+                    speechRecognitionActive = false;
+                    ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                    if (matches != null && !matches.isEmpty()) {
+                        String text = matches.get(0);
+                        Log.i(TAG, "Voice result: " + text);
+                        String safe = text.replace("'", "\\'").replace("\n", " ");
+                        webView.post(() -> webView.evaluateJavascript(
+                            "onVoiceResult('" + safe + "')", null));
+                    } else {
+                        webView.post(() -> webView.evaluateJavascript(
+                            "onVoiceError('No speech detected')", null));
+                    }
+                }
+                @Override public void onPartialResults(Bundle partialResults) {}
+                @Override public void onEvent(int eventType, Bundle params) {}
+            });
+            Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN");
+            intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+            intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false);
+            speechRecognitionActive = true;
+            speechRecognizer.startListening(intent);
+            Log.i(TAG, "Voice: started listening");
+        } catch (Exception e) {
+            speechRecognitionActive = false;
+            Log.e(TAG, "Voice start failed", e);
+            final String errMsg = e.getMessage();
+            webView.post(() -> webView.evaluateJavascript(
+                "onVoiceError('" + (errMsg != null ? errMsg.replace("'", "\\'") : "Failed to start") + "')", null));
+        }
+    }
+
+    @JavascriptInterface
+    public void cancelVoiceRecognition() {
+        try {
+            if (speechRecognizer != null) {
+                speechRecognizer.cancel();
+                speechRecognizer.destroy();
+                speechRecognizer = null;
+            }
+        } catch (Exception ignored) {}
+        speechRecognitionActive = false;
+    }
 
     public MediaBridge(Context context, WebView wv) {
         this.ctx = context;

@@ -16,8 +16,8 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
 
     private ActivityResultLauncher<String> notifPermissionLauncher;
+    private ActivityResultLauncher<String> audioPermissionLauncher;
     private int bridgeInjectAttempts = 0;
-    private boolean isPausing = false;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -30,20 +30,33 @@ public class MainActivity extends BridgeActivity {
             result -> {}
         );
 
+        audioPermissionLauncher = registerForActivityResult(
+            new ActivityResultContracts.RequestPermission(),
+            result -> {
+                if (result) {
+                    try {
+                        WebView wv = getBridge().getWebView();
+                        if (wv != null) {
+                            wv.post(() -> wv.evaluateJavascript(
+                                "if(window.onVoiceReady)onVoiceReady();", null));
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+        );
+
         injectBridge();
         requestNotifPermission();
     }
 
     @Override
     public void onPause() {
-        isPausing = true;
         super.onPause();
         try {
             WebView wv = getBridge().getWebView();
             if (wv != null) {
                 wv.onResume();
                 wv.resumeTimers();
-                // Force switch from YouTube iframe to streaming URL for background playback
                 wv.evaluateJavascript("if(window.forceSwitchToStream)forceSwitchToStream();", null);
             }
         } catch (Exception ignored) {}
@@ -52,7 +65,6 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onResume() {
         super.onResume();
-        isPausing = false;
         try {
             WebView wv = getBridge().getWebView();
             if (wv != null) {
@@ -91,6 +103,15 @@ public class MainActivity extends BridgeActivity {
                 == PackageManager.PERMISSION_GRANTED) return;
         try {
             notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
+        } catch (Exception ignored) {}
+    }
+
+    public void requestRecordAudioPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                == PackageManager.PERMISSION_GRANTED) return;
+        try {
+            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO);
         } catch (Exception ignored) {}
     }
 }

@@ -14,8 +14,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#08080f;
 @keyframes spin{to{transform:rotate(360deg)}}
 header{display:flex;align-items:center;gap:8px;padding:12px 16px;background:#12121e;border-bottom:1px solid #2a2a4a}
 header h1{font-size:1.2rem;flex:1;background:linear-gradient(135deg,#e94560,#ff6b81);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-header #micBtn{background:none;border:none;color:#888;font-size:1.3rem;padding:6px 10px;cursor:pointer;border-radius:8px;transition:color .3s}
-header #micBtn.active{color:#e94560;animation:pulse 1s infinite}
+header #micBtn{background:none;border:none;color:#888;font-size:1.3rem;padding:6px 10px;cursor:pointer;border-radius:8px}
+header #micBtn.active{color:#e94560}
+header #micBtn.listening{color:#e94560;animation:pulse 1s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .search-wrap{display:flex;gap:6px;padding:10px 16px}
 .search-wrap input{flex:1;padding:10px 14px;border:1px solid #2a2a4a;border-radius:10px;background:#12121e;color:#fff;font-size:14px;outline:none}
@@ -44,13 +45,13 @@ header #micBtn.active{color:#e94560;animation:pulse 1s infinite}
 .player .ctrl .pp{color:#e94560;font-size:1.8rem}
 .player .ctrl button:active{background:rgba(255,255,255,.1)}
 .empty{text-align:center;color:#666;padding:2rem;font-size:14px}
-.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1a1a2e;border:1px solid #2a2a4a;color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;z-index:100;transition:opacity .3s;pointer-events:none}
-.toast.hide{opacity:0}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1a1a2e;border:1px solid #2a2a4a;color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;z-index:100;opacity:0;pointer-events:none}
+.toast.show{opacity:1}
 #updateScreen{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:200;background:rgba(0,0,0,.85);backdrop-filter:blur(20px)}
 #updateScreen.show{display:flex}
 .update-box{background:#1a1a2e;border:1px solid #2a2a4a;border-radius:16px;padding:2rem;width:100%;max-width:340px;text-align:center}
 .update-box h2{color:#e94560;margin-bottom:8px}
-.update-box p{color:#888;font-size:13px;margin-bottom:16px;line-height:1.4}
+.update-box p{color:#888;font-size:13px;margin-bottom:16px}
 .update-box button{width:100%;padding:14px;border:none;border-radius:10px;background:#e94560;color:#fff;font-size:15px;font-weight:600;cursor:pointer}
 .update-box button:disabled{opacity:.5;cursor:default}
 </style>
@@ -61,7 +62,7 @@ header #micBtn.active{color:#e94560;animation:pulse 1s infinite}
 
 <header>
   <h1>MoodFlow</h1>
-  <button id="micBtn" onclick="toggleMic()">&#127908;</button>
+  <button id="micBtn" onclick="onMicClick()">&#127908;</button>
 </header>
 
 <div class="search-wrap">
@@ -103,7 +104,7 @@ header #micBtn.active{color:#e94560;animation:pulse 1s infinite}
   </div>
 </div>
 
-<div id="toast" class="toast hide"></div>
+<div id="toast" class="toast"></div>
 
 <script>
 (function(){
@@ -111,7 +112,7 @@ header #micBtn.active{color:#e94560;animation:pulse 1s infinite}
 
 var currentTrack=null,currentIdx=-1,playing=false,audio=null,results=[],queue=[],qIdx=0;
 var nativePlaying=false,updateChecked=false,updateInfo=null;
-var recog=null,recogActive=false;
+var micActive=false;
 
 function $(i){return document.getElementById(i)}
 
@@ -119,16 +120,14 @@ function toast(m){
   var e=$('toast');
   if(!e)return;
   e.textContent=m;
-  e.classList.remove('hide');
+  e.classList.add('show');
   clearTimeout(e._t);
-  e._t=setTimeout(function(){e.classList.add('hide')},3000);
+  e._t=setTimeout(function(){e.classList.remove('show')},3000);
 }
 
 function err(m){toast(m);var s=$('st');if(s)s.textContent=m}
-
 function updateStatus(m){var s=$('st');if(s)s.textContent=m}
 
-// ===== SPLASH =====
 $('splash').classList.add('hide');
 
 // ===== SEARCH =====
@@ -148,7 +147,7 @@ function search(q){
     renderList(results);
     updateStatus(results.length+' songs found');
   }).catch(function(){
-    return fetch('https://pipedapi.syncpundit.io/search?q='+encodeURIComponent(q)+'&filter=videos').then(function(r){
+    fetch('https://pipedapi.syncpundit.io/search?q='+encodeURIComponent(q)+'&filter=videos').then(function(r){
       if(r.status!==200)throw Error('HTTP '+r.status);
       return r.json();
     }).then(function(d){
@@ -171,12 +170,12 @@ function renderList(arr){
   var h='';
   for(var i=0;i<arr.length;i++){
     var t=arr[i];
-    h+='<div class="item" onclick="playFromList('+i+')"><div class="th">'+(t.thumb?'<img src="'+t.thumb+'">':'')+'</div><div class="info"><div class="t">'+escapeHtml(t.title)+'</div><div class="a">'+escapeHtml(t.artist)+'</div></div></div>';
+    h+='<div class="item" onclick="playFromList('+i+')"><div class="th">'+(t.thumb?'<img src="'+t.thumb+'">':'')+'</div><div class="info"><div class="t">'+esc(t.title)+'</div><div class="a">'+esc(t.artist)+'</div></div></div>';
   }
   $('list').innerHTML=h;
 }
 
-function escapeHtml(s){
+function esc(s){
   if(!s)return'';
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
@@ -185,18 +184,21 @@ function escapeHtml(s){
 function getStream(id){
   return new Promise(function(resolve){
     try{
-      if(window.MediaBridge){var u=window.MediaBridge.getStreamUrl(id);if(u){resolve(u);return}}
+      if(window.MediaBridge && window.MediaBridge.getStreamUrl){
+        var u=window.MediaBridge.getStreamUrl(id);
+        if(u && u.length>0){resolve(u);return}
+      }
     }catch(e){}
     fetch('https://pipedapi.kavin.rocks/streams/'+id).then(function(r){
       if(r.status!==200)throw Error('HTTP '+r.status);
       return r.json();
     }).then(function(d){
-      var as=d.audioStreams;
-      if(as&&as.length){
-        for(var i=0;i<as.length;i++){
-          if(as[i].mimeType&&as[i].mimeType.indexOf('audio/webm')>=0){resolve(as[i].url);return}
+      if(d.audioStreams&&d.audioStreams.length){
+        var best=d.audioStreams[0];
+        for(var i=1;i<d.audioStreams.length;i++){
+          if(d.audioStreams[i].mimeType&&d.audioStreams[i].mimeType.indexOf('audio/webm')>=0){best=d.audioStreams[i];break}
         }
-        resolve(as[0].url);return;
+        resolve(best.url);return;
       }
       if(d.videoStreams&&d.videoStreams.length){resolve(d.videoStreams[0].url);return}
       resolve('');
@@ -219,12 +221,12 @@ function playTrack(track){
     $('pth').innerHTML=track.thumb?'<img src="'+track.thumb+'">':'';
     $('pt').textContent=track.title;
     $('pa').textContent=track.artist;
-    doUpdateUI();
-    doUpdateMediaSession(track);
+    updateUI();
+    updateMediaSession(track);
     updateStatus('Loading stream...');
     getStream(track.id).then(function(u){
       try{
-        if(!u){err('Cannot get stream URL');playing=false;doUpdateUI();return}
+        if(!u||u.length===0){err('Cannot get stream URL');playing=false;updateUI();return}
         updateStatus('Starting playback...');
         nativePlaying=false;
         var hasNative=false;
@@ -238,8 +240,8 @@ function playTrack(track){
         if(!hasNative){
           if(!audio){
             audio=new Audio();
-            audio.onended=function(){try{if(queue.length>1)doNext();else{playing=false;doUpdateUI()}}catch(e){}};
-            audio.onerror=function(){try{if(queue.length>1)doNext()}};
+            audio.onended=function(){try{if(queue.length>1)doNext();else{playing=false;updateUI()}}catch(e){}};
+            audio.onerror=function(){try{if(queue.length>1)doNext()}catch(e){}};
           }
           try{audio.src=u;audio.play();updateStatus('Playing')}catch(e){err('Play failed: '+e.message)}
         }else{
@@ -247,19 +249,18 @@ function playTrack(track){
         }
       }catch(e){err('Playback error: '+e.message)}
     }).catch(function(e){
-      err('Stream error: '+(e.message||'unknown'));
+      err('Failed to load: '+(e.message||'unknown'));
       playing=false;
-      doUpdateUI();
+      updateUI();
     });
     return true;
   }catch(e){err('playTrack: '+e.message);return false}
 }
 
-function doUpdateUI(){
+function updateUI(){
   try{
     var btn=$('pp');
     if(btn)btn.innerHTML=playing?'⏸':'►';
-    if(currentTrack&&playing)updateStatus(currentTrack.title)
   }catch(e){}
 }
 
@@ -271,22 +272,22 @@ function doTogglePlay(){
         if(window.MediaBridge&&window.MediaBridge.stopNativePlayback){
           window.MediaBridge.stopNativePlayback();
           playing=false;nativePlaying=false;
-          doUpdateUI();syncPlaying(false);
+          updateUI();syncPlaying(false);
           return;
         }
       }catch(e){}
       nativePlaying=false;
       if(audio){if(audio.paused){audio.play();playing=true}else{audio.pause();playing=false}}
-      syncPlaying(playing);doUpdateUI();return;
+      syncPlaying(playing);updateUI();return;
     }
     if(window.MediaBridge&&window.MediaBridge.setPlaying){
       playing=!playing;
       window.MediaBridge.setPlaying(playing);
-      doUpdateUI();return;
+      updateUI();return;
     }
     if(!audio){toast('Audio not ready');return}
     if(audio.paused){audio.play();playing=true}else{audio.pause();playing=false}
-    doUpdateUI();syncPlaying(playing)
+    updateUI();syncPlaying(playing);
   }catch(e){err('togglePlay: '+e.message)}
 }
 
@@ -332,29 +333,41 @@ function onNativeAudioStart(){
   try{if(audio)audio.pause()}catch(e){}
 }
 
-function mediaOnPlay(){try{if(nativePlaying){syncPlaying(true);return}doTogglePlay()}catch(e){}}
-function mediaOnPause(){try{if(nativePlaying){syncPlaying(false);return}doTogglePlay()}catch(e){}}
-function mediaOnNext(){doNext()}
-function mediaOnPrev(){doPrev()}
-function sk(){doNext()}
-function prv(){doPrev()}
+// Called by native notification actions (via execJs)
+function mediaOnPlay(){
+  try{
+    if(nativePlaying){syncPlaying(true);return}
+    doTogglePlay();
+  }catch(e){}
+}
+function mediaOnPause(){
+  try{
+    if(nativePlaying){syncPlaying(false);return}
+    doTogglePlay();
+  }catch(e){}
+}
+function mediaOnNext(){try{doNext()}catch(e){}}
+function mediaOnPrev(){try{doPrev()}catch(e){}}
+function sk(){try{doNext()}catch(e){}}
+function prv(){try{doPrev()}catch(e){}}
 
 // ===== SWIPE =====
 (function(){
   var p=$('player');
-  var sx=0,sy=0,sw=0;
+  var sx=0,sy=0,sw=false;
   function ts(e){
     try{
-      if(e.target.closest('button')||!p||p.style.display==='none'){sx=0;return}
-      var t=e.touches[0];
-      sx=t.screenX;sy=t.screenY;sw=true;
+      if(e.target.closest('button')||!p||p.style.display==='none'){sx=0;sw=false;return}
+      sx=e.touches[0].screenX;
+      sy=e.touches[0].screenY;
+      sw=true;
     }catch(e){}
   }
   function te(e){
     try{
       if(!sw||!sx)return;
-      var t=e.changedTouches[0];
-      var dx=t.screenX-sx,dy=t.screenY-sy;
+      var dx=e.changedTouches[0].screenX-sx;
+      var dy=e.changedTouches[0].screenY-sy;
       sx=0;sw=false;
       if(Math.abs(dy)>Math.abs(dx)||Math.abs(dx)<50)return;
       if(dx>0)doPrev();else doNext();
@@ -364,7 +377,7 @@ function prv(){doPrev()}
 })();
 
 // ===== MEDIA SESSION =====
-function doUpdateMediaSession(track){
+function updateMediaSession(track){
   try{
     navigator.mediaSession.metadata=new MediaMetadata({title:track.title||'MoodFlow',artist:track.artist||''});
     navigator.mediaSession.playbackState='playing';
@@ -375,56 +388,64 @@ function doUpdateMediaSession(track){
   }catch(e){}
 }
 
-// ===== VOICE SEARCH =====
-function toggleMic(){
+// ===== VOICE SEARCH (Native Bridge) =====
+function onMicClick(){
   try{
-    if(recogActive){stopMic();return}
-    var SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
-    if(!SpeechRecognition){toast('Voice search not supported on this device');return}
-    recog=new SpeechRecognition();
-    recog.lang='hi-IN';
-    recog.continuous=false;
-    recog.interimResults=false;
-    recog.maxAlternatives=1;
-    recog.onresult=function(e){
-      var text=e.results[0][0].transcript;
-      stopMic();
-      $('si').value=text;
-      if(text.trim())search(text.trim());
-    };
-    recog.onerror=function(e){
-      stopMic();
-      if(e.error==='no-speech')toast('No speech detected. Try again.');
-      else if(e.error==='not-allowed')toast('Microphone permission denied. Please allow mic access.');
-      else if(e.error==='network')toast('Network error during voice recognition.');
-      else toast('Voice error: '+e.error);
-    };
-    recog.onend=function(){
-      recogActive=false;
+    if(micActive){stopMic();return}
+    if(window.MediaBridge&&window.MediaBridge.startVoiceRecognition){
+      try{window.MediaBridge.startVoiceRecognition()}catch(e){toast('Voice error: '+e.message);return}
+      micActive=true;
       var btn=$('micBtn');
-      if(btn)btn.classList.remove('active');
-    };
-    recog.start();
-    recogActive=true;
-    var btn=$('micBtn');
-    if(btn)btn.classList.add('active');
-    toast('Listening... Speak now');
-  }catch(e){toast('Voice search failed: '+e.message)}
+      if(btn)btn.classList.add('listening');
+      toast('Listening...');
+    }else{
+      toast('Voice search not available');
+    }
+  }catch(e){toast('Voice error: '+e.message)}
 }
 
 function stopMic(){
+  micActive=false;
+  if(window.MediaBridge&&window.MediaBridge.cancelVoiceRecognition){
+    try{window.MediaBridge.cancelVoiceRecognition()}catch(e){}
+  }
+  var btn=$('micBtn');
+  if(btn){btn.classList.remove('active');btn.classList.remove('listening')}
+}
+
+// Called by native speech recognizer with results
+function onVoiceResult(text){
   try{
-    recogActive=false;
-    if(recog){recog.abort();recog=null}
-    var btn=$('micBtn');
-    if(btn)btn.classList.remove('active');
+    stopMic();
+    if(text&&text.trim()){
+      $('si').value=text;
+      search(text.trim());
+    }else{
+      toast('No speech detected');
+    }
   }catch(e){}
+}
+
+function onVoiceError(msg){
+  stopMic();
+  toast(msg||'Voice recognition failed');
+}
+
+function onVoiceReady(){
+  var btn=$('micBtn');
+  if(btn){btn.classList.add('active')}
+}
+
+// Called by native when app resumes
+function forceSwitchToStream(){
+  // Native playback is already active - nothing needed
 }
 
 // ===== EVENTS =====
 $('sb').onclick=function(){
   var q=$('si').value.trim();
   if(!q)return;
+  stopMic();
   var chips=document.querySelectorAll('.chip');
   for(var i=0;i<chips.length;i++)chips[i].classList.remove('on');
   search(q);
@@ -436,6 +457,7 @@ var chips=document.querySelectorAll('.chip');
 for(var i=0;i<chips.length;i++){
   (function(c){
     c.onclick=function(){
+      stopMic();
       var all=document.querySelectorAll('.chip');
       for(var j=0;j<all.length;j++)all[j].classList.remove('on');
       c.classList.add('on');
@@ -474,8 +496,7 @@ function onUpdateCheck(tag,apkUrl){
         $('ut').textContent='A new version is available.';
         var btn=$('updateBtn');
         if(btn){btn.disabled=false;btn.textContent='Update'}
-        var us=$('updateScreen');
-        if(us)us.classList.add('show');
+        $('updateScreen').classList.add('show');
         return;
       }
       if(na<nb)return;

@@ -211,8 +211,11 @@ public class MediaPlaybackService extends Service {
     private void execJs(String js) {
         WebView wv = MediaControlsPlugin.webViewRef;
         if (wv == null) return;
-        try { wv.post(() -> { try { wv.evaluateJavascript(js, null); } catch (Exception ignored) {} }); } catch (Exception ignored) {}
-        try { wv.loadUrl("javascript:" + js); } catch (Exception ignored) {}
+        try {
+            wv.post(() -> {
+                try { wv.evaluateJavascript(js, null); } catch (Exception ignored) {}
+            });
+        } catch (Exception ignored) {}
     }
 
     @Override
@@ -339,12 +342,7 @@ public class MediaPlaybackService extends Service {
     private NotificationCompat.Action notifAction(int reqCode, int icon, String title, String serviceAction) {
         Intent i = new Intent(this, MediaPlaybackService.class);
         i.setAction(serviceAction);
-        int flags = PendingIntent.FLAG_CANCEL_CURRENT;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            flags |= PendingIntent.FLAG_MUTABLE;
-        } else {
-            flags |= PendingIntent.FLAG_IMMUTABLE;
-        }
+        int flags = PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_IMMUTABLE;
         PendingIntent pi;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             pi = PendingIntent.getForegroundService(this, reqCode, i, flags);
