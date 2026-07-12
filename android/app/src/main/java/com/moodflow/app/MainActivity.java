@@ -1,16 +1,11 @@
 package com.moodflow.app;
 
 import android.Manifest;
-import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.PowerManager;
-import android.provider.Settings;
 import android.webkit.WebView;
 import android.webkit.WebSettings;
-import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -37,7 +32,6 @@ public class MainActivity extends BridgeActivity {
 
         injectBridge();
         requestNotifPermission();
-        requestBatteryOpt();
     }
 
     @Override
@@ -59,6 +53,12 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         isPausing = false;
+        try {
+            WebView wv = getBridge().getWebView();
+            if (wv != null) {
+                wv.evaluateJavascript("if(window.checkRelease)checkRelease();", null);
+            }
+        } catch (Exception ignored) {}
     }
 
     private void injectBridge() {
@@ -91,19 +91,6 @@ public class MainActivity extends BridgeActivity {
                 == PackageManager.PERMISSION_GRANTED) return;
         try {
             notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
-        } catch (Exception ignored) {}
-    }
-
-    private void requestBatteryOpt() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
-        try {
-            PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
-            if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
-                Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(intent);
-                Toast.makeText(this, "Please find MoodFlow and set 'Don't optimize' for background playback", Toast.LENGTH_LONG).show();
-            }
         } catch (Exception ignored) {}
     }
 }
