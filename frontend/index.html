@@ -102,8 +102,8 @@ header button{background:none;border:none;color:#fff;font-size:1.2rem;padding:6p
 <div id="updateScreen">
   <div class="update-box">
     <h2>Update Available</h2>
-    <p id="updateText">New version available</p>
-    <button id="updateBtn" onclick="doUpdate()">Download Update</button>
+    <p id="updateText">New version available. Please update to continue.</p>
+    <button id="updateBtn" onclick="doUpdate()">Update Now</button>
   </div>
 </div>
 
@@ -256,18 +256,19 @@ function prv(){prevTrack()}
 
 // ===== SWIPE =====
 (function(){
-  var sx=0,st=0;
-  document.addEventListener('touchstart',function(e){
-    if(!e.target.closest('.player'))return;
-    sx=e.touches[0].screenX;st=Date.now()
-  },{passive:true});
-  document.addEventListener('touchend',function(e){
+  var sx=0;
+  var tap=function(e){
+    var el=e.target.closest('.player');
+    if(!el||e.target.closest('button'))return;
+    if(e.type==='touchstart'){sx=e.touches[0].screenX;return}
     if(!sx)return;
-    var dx=e.changedTouches[0].screenX-sx,dt=Date.now()-st;
+    var dx=(e.changedTouches?e.changedTouches[0].screenX:0)-sx;
     sx=0;
-    if(dt>400||Math.abs(dx)<40)return;
+    if(Math.abs(dx)<50)return;
     if(dx>0)prevTrack();else nextTrack()
-  },{passive:true})
+  };
+  document.addEventListener('touchstart',tap,{passive:true});
+  document.addEventListener('touchend',tap,{passive:true})
 })();
 
 // ===== MEDIA SESSION =====

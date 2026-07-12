@@ -1,9 +1,13 @@
 package com.moodflow.app;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.webkit.WebView;
 import android.webkit.WebSettings;
 
@@ -32,6 +36,7 @@ public class MainActivity extends BridgeActivity {
 
         injectBridge();
         requestNotifPermission();
+        requestBatteryOpt();
     }
 
     @Override
@@ -85,6 +90,18 @@ public class MainActivity extends BridgeActivity {
                 == PackageManager.PERMISSION_GRANTED) return;
         try {
             notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
+        } catch (Exception ignored) {}
+    }
+
+    private void requestBatteryOpt() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
+        try {
+            PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+            if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
+                Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                intent.setData(Uri.parse("package:" + getPackageName()));
+                startActivity(intent);
+            }
         } catch (Exception ignored) {}
     }
 }
