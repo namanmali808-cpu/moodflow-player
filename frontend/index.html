@@ -1,1729 +1,369 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>MoodFlow</title>
-<link rel="manifest" href="/manifest.json">
-<link rel="icon" href="/icon-192.png" sizes="192x192">
-<link rel="apple-touch-icon" href="/icon-192.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#7c3aed">
+<title>MoodFlow Music</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-::-webkit-scrollbar{width:3px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:10px}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:#08080f;background-image:radial-gradient(ellipse at 20% 50%,rgba(102,126,234,.04) 0%,transparent 60%),radial-gradient(ellipse at 80% 50%,rgba(245,87,108,.04) 0%,transparent 60%);color:#fff;min-height:100vh;display:flex;flex-direction:column;touch-action:manipulation;overflow-x:hidden}
-.container{padding:20px;flex:1;display:flex;flex-direction:column;max-width:420px;margin:0 auto;width:100%;gap:10px}
-.header{text-align:center;padding:4px 0 14px}
-.header h1{font-size:32px;font-weight:900;background:linear-gradient(135deg,#818cf8 0%,#a78bfa 40%,#f472b6 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-.5px;text-shadow:none}
-.header p{font-size:9px;opacity:.25;margin-top:3px;letter-spacing:3px;text-transform:uppercase}
-.sRow{display:flex;gap:8px;margin-bottom:4px}
-.sRow input{flex:1;padding:14px 18px;border:none;border-radius:16px;font-size:14px;background:rgba(255,255,255,.06);color:#fff;outline:none;transition:all .25s;letter-spacing:.2px}
-.sRow input:focus{background:rgba(255,255,255,.1);box-shadow:0 0 0 1.5px rgba(129,140,248,.25),0 8px 32px rgba(0,0,0,.2)}
-.sRow input::placeholder{color:rgba(255,255,255,.2)}
-#sBtn{padding:14px 20px;border:none;border-radius:16px;font-size:13px;font-weight:700;color:#fff;cursor:pointer;background:linear-gradient(135deg,#818cf8,#a78bfa);transition:all .25s;box-shadow:0 4px 16px rgba(129,140,248,.2)}
-#sBtn:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(129,140,248,.3)}
-#sBtn:active{transform:scale(.94)}
-#sRes{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.04);border-radius:16px;max-height:0;overflow:hidden;transition:max-height .35s cubic-bezier(.4,0,.2,1),margin .35s ease;margin-bottom:0;backdrop-filter:blur(12px)}
-#sRes.show{max-height:260px;overflow-y:auto;margin-bottom:8px}
-#sRes div{padding:11px 16px;font-size:13px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03);transition:all .15s;color:rgba(255,255,255,.8)}
-#sRes div:last-child{border-bottom:none;border-radius:0 0 16px 16px}
-#sRes div:first-child{border-radius:16px 16px 0 0}
-#sRes div:hover{background:rgba(255,255,255,.06);color:#fff}
-.row{display:flex;gap:8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.04);border-radius:18px;padding:12px;margin-bottom:3px;transition:all .2s}
-.row select{flex:1;padding:11px 12px;border:none;border-radius:13px;font-size:12px;font-weight:600;background:rgba(255,255,255,.07);color:rgba(255,255,255,.9);cursor:pointer;-webkit-appearance:none;transition:all .2s;letter-spacing:.3px}
-.row select:hover{background:rgba(255,255,255,.1)}
-.row select option{color:#fff;background:#12121a}
-.btnRow{display:flex;gap:8px;margin-bottom:4px}
-.btnRow button{flex:1;padding:13px 5px;border:none;border-radius:16px;font-size:14px;font-weight:700;color:#fff;cursor:pointer;transition:all .2s;letter-spacing:.5px;position:relative;overflow:hidden}
-.btnRow button:active{transform:scale(.92)}
-.tRow{display:flex;gap:8px;margin-bottom:6px}
-.tRow button{flex:1;padding:9px 5px;border:none;border-radius:12px;font-size:11px;font-weight:700;color:#fff;cursor:pointer;transition:all .2s;letter-spacing:.3px}
-.tRow button:active{transform:scale(.93)}
-.primaryBtn{background:linear-gradient(135deg,#34d399,#2dd4bf)!important;color:#0a0a12!important;box-shadow:0 4px 20px rgba(52,211,153,.25)}
-.dangerBtn{background:linear-gradient(135deg,#f472b6,#fb7185)!important;box-shadow:0 4px 20px rgba(244,114,182,.25)}
-.offBtn{background:rgba(255,255,255,.05)!important;border:1px solid rgba(255,255,255,.04)!important}
-.onBtn{background:linear-gradient(135deg,#818cf8,#a78bfa)!important;box-shadow:0 4px 20px rgba(129,140,248,.25)}
-.hookOn{background:linear-gradient(135deg,#f472b6,#fb7185)!important;color:#fff!important;box-shadow:0 4px 20px rgba(244,114,182,.25)}
-#volWrap{display:flex;align-items:center;gap:14px;padding:6px 2px 8px}
-#volWrap span{font-size:11px;min-width:14px;text-align:center;opacity:.35}
-#volWrap input{flex:1;accent-color:#f472b6;height:3px;border-radius:4px;cursor:pointer;opacity:.6}
-#volWrap input:hover{opacity:1}
-#status{text-align:center;font-size:11px;padding:6px 12px;border-radius:12px;margin-bottom:0;min-height:26px;background:rgba(255,255,255,.02);color:rgba(255,255,255,.4);letter-spacing:.3px}
-#title{font-size:20px;font-weight:700;margin-bottom:4px;position:relative;z-index:1;line-height:1.3}
-#sub{font-size:12px;opacity:.4;position:relative;z-index:1;letter-spacing:.2px}
-.card{background:linear-gradient(160deg,rgba(129,140,248,.1),rgba(244,114,182,.06));border-radius:28px;padding:28px 22px;text-align:center;flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;border:1px solid rgba(255,255,255,.05);position:relative;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.2)}
-.card::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(ellipse at 50% 50%,rgba(129,140,248,.06) 0%,transparent 50%);pointer-events:none}
-.card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(129,140,248,.2),transparent)}
-#progW{width:100%;height:6px;background:rgba(255,255,255,.04);border-radius:4px;margin-top:18px;overflow:visible;position:relative;z-index:1;cursor:pointer}
-#progW:hover{background:rgba(255,255,255,.06)}
-#prog{height:100%;width:0;background:linear-gradient(90deg,#818cf8,#f472b6);border-radius:4px;transition:width .25s cubic-bezier(.4,0,.2,1);pointer-events:none}
-#prog{height:100%;width:0;background:linear-gradient(90deg,#818cf8,#f472b6);border-radius:4px;transition:width .3s cubic-bezier(.4,0,.2,1)}
-#micOv{position:fixed;top:0;left:0;width:100%;height:100%;z-index:100;display:none;justify-content:center;align-items:center;background:rgba(0,0,0,.8);backdrop-filter:blur(40px)}
-#micOv.active{display:flex}
-#micOv .b{background:linear-gradient(135deg,#818cf8,#a78bfa);width:104px;height:104px;border-radius:50%;display:flex;justify-content:center;align-items:center;font-size:44px;animation:pulse 1.3s ease-in-out infinite;box-shadow:0 0 80px rgba(129,140,248,.25),0 0 160px rgba(129,140,248,.1)}
-@keyframes pulse{0%{transform:scale(1);opacity:1}50%{transform:scale(1.06);opacity:.85}100%{transform:scale(1);opacity:1}}
-#micOv .tx{position:absolute;bottom:22%;color:rgba(255,255,255,.85);font-size:15px;text-align:center;width:80%;background:rgba(255,255,255,.06);padding:16px 20px;border-radius:18px;backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.04);box-shadow:0 4px 24px rgba(0,0,0,.2)}
-#ytWrap{position:fixed;bottom:0;right:0;width:300px;height:150px;opacity:0.01;pointer-events:none;z-index:-1}
-.qi{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:12px;cursor:pointer;transition:all .15s;margin:2px 0}
-.qi:hover{background:rgba(255,255,255,.06)}
-.qi img{width:36px;height:27px;border-radius:6px;object-fit:cover;flex-shrink:0}
-.qi .qt{font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.qi .qn{font-size:10px;opacity:.3;min-width:20px;text-align:right}
-.qi.qiNow{background:rgba(129,140,248,.1);border:1px solid rgba(129,140,248,.15)}
-.qi.qiNow .qt{color:#818cf8;font-weight:600}
-#authScrn{position:fixed;top:0;left:0;width:100%;height:100%;z-index:200;display:none;justify-content:center;align-items:center;background:#08080f;flex-direction:column;padding:24px}
-#authScrn.hidden{display:none}
-#authScrn .abox{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);border-radius:28px;padding:32px;width:100%;max-width:360px;text-align:center;backdrop-filter:blur(12px);box-shadow:0 8px 48px rgba(0,0,0,.15)}
-#authScrn h2{font-size:26px;font-weight:800;margin-bottom:4px;background:linear-gradient(135deg,#818cf8,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-#authScrn p{font-size:12px;opacity:.4;margin-bottom:22px}
-#authScrn input{width:100%;padding:15px;border:none;border-radius:16px;font-size:16px;background:rgba(255,255,255,.06);color:#fff;outline:none;text-align:center;margin-bottom:12px;transition:all .2s}
-#authScrn input:focus{background:rgba(255,255,255,.09);box-shadow:0 0 0 1.5px rgba(129,140,248,.2)}
-#authScrn input::placeholder{color:rgba(255,255,255,.15);font-size:14px}
-#authScrn button{width:100%;padding:15px;border:none;border-radius:16px;font-size:15px;font-weight:700;color:#fff;cursor:pointer;background:linear-gradient(135deg,#818cf8,#a78bfa);transition:all .25s;box-shadow:0 4px 16px rgba(129,140,248,.2)}
-#authScrn button:active{transform:scale(.97)}
-#authScrn .note{font-size:11px;opacity:.3;margin-top:14px}
-#authScrn .link{font-size:12px;opacity:.4;margin-top:14px;cursor:pointer;transition:all .2s}
-#authScrn .link:hover{opacity:1;color:#818cf8}
-#subScrn{position:fixed;top:0;left:0;width:100%;height:100%;z-index:150;display:none;justify-content:center;align-items:center;background:rgba(0,0,0,.85);backdrop-filter:blur(40px);flex-direction:column;padding:24px}
-#subScrn.show{display:flex}
-#subScrn .sbox{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);border-radius:28px;padding:32px;width:100%;max-width:360px;text-align:center;box-shadow:0 8px 48px rgba(0,0,0,.15)}
-#subScrn h2{font-size:24px;font-weight:800;margin-bottom:4px}
-#subScrn .price{font-size:40px;font-weight:900;background:linear-gradient(135deg,#818cf8,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:12px 0}
-#subScrn .perks{text-align:left;padding:12px 0;font-size:14px;opacity:.65;line-height:1.8}
-#subScrn .perks div{padding:2px 0}
-#subPbtn{width:100%;padding:16px;border:none;border-radius:16px;font-size:16px;font-weight:700;color:#fff;cursor:pointer;background:linear-gradient(135deg,#818cf8,#a78bfa);margin-top:12px;transition:all .25s;box-shadow:0 4px 16px rgba(129,140,248,.2)}
-#subPbtn:active{transform:scale(.97)}
-#subLater{width:100%;padding:14px;border:none;border-radius:16px;font-size:13px;font-weight:600;color:rgba(255,255,255,.35);cursor:pointer;background:transparent;margin-top:6px;transition:all .2s}
-#subLater:hover{color:rgba(255,255,255,.6)}
-.sBadge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:9px;font-weight:700;margin-left:5px;letter-spacing:.3px;text-transform:uppercase}
-.sActive{background:rgba(52,211,153,.15);color:#34d399;border:1px solid rgba(52,211,153,.2)}
-.sExpired{background:rgba(251,113,133,.15);color:#fb7185;border:1px solid rgba(251,113,133,.2)}
-.sTrial{background:rgba(129,140,248,.15);color:#818cf8;border:1px solid rgba(129,140,248,.2)}
-.premium #crownBadge{display:inline!important;animation:crownPulse 2s ease-in-out infinite}
-@keyframes crownPulse{0%{opacity:.7}50%{opacity:1;transform:scale(1.1)}100%{opacity:.7}}
-.premium #premiumGlow{display:block!important}
-.premium .card{box-shadow:0 0 8px rgba(147,51,234,.15),0 0 25px rgba(147,51,234,.08),0 8px 40px rgba(0,0,0,.2);border-color:rgba(147,51,234,.15)!important;animation:borderPulse 3s ease-in-out infinite}
-@keyframes borderPulse{0%{box-shadow:0 0 6px rgba(147,51,234,.12),0 0 18px rgba(147,51,234,.06),0 8px 40px rgba(0,0,0,.2)}50%{box-shadow:0 0 14px rgba(147,51,234,.25),0 0 35px rgba(147,51,234,.12),0 8px 40px rgba(0,0,0,.2)}100%{box-shadow:0 0 6px rgba(147,51,234,.12),0 0 18px rgba(147,51,234,.06),0 8px 40px rgba(0,0,0,.2)}}
-.premium .card::before{background:radial-gradient(ellipse at 50% 50%,rgba(147,51,234,.06) 0%,transparent 50%)!important}
-.premium #prog{background:linear-gradient(90deg,#9333ea,#a855f7)!important}
-.premium #status{color:rgba(167,139,250,.5)!important}
-.premium .header h1{background:linear-gradient(135deg,#9333ea,#a855f7,#c084fc)!important;-webkit-background-clip:text!important;-webkit-text-fill-color:transparent!important}
-@keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(400%)}}
-.premium .card::after{content:''!important;position:absolute!important;top:0!important;left:0!important;width:25%!important;height:100%!important;background:linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent)!important;animation:shimmer 3.5s ease-in-out infinite!important;z-index:2!important;pointer-events:none!important;opacity:1!important}
-.premium #premiumRibbon{display:block!important;background:linear-gradient(135deg,#9333ea,#a855f7)!important;color:#fff!important}
-.premium #visualizer{display:flex!important}
-.premium #visualizer span{animation:barAnim 1.2s ease-in-out infinite alternate}
-.premium #visualizer span:nth-child(1){height:6px;animation-delay:0s}
-.premium #visualizer span:nth-child(2){height:14px;animation-delay:.15s}
-.premium #visualizer span:nth-child(3){height:10px;animation-delay:.3s}
-.premium #visualizer span:nth-child(4){height:18px;animation-delay:.45s}
-.premium #visualizer span:nth-child(5){height:8px;animation-delay:.6s}
-@keyframes barAnim{0%{height:4px;opacity:.4}100%{height:18px;opacity:1}}
-.premium #thumb{width:130px!important;height:98px!important;border-radius:16px!important;border:1px solid rgba(147,51,234,.2)!important;box-shadow:0 4px 20px rgba(0,0,0,.3)!important}
-@keyframes particleFly{0%{transform:translate(0,0) scale(1);opacity:1}100%{transform:translate(var(--x),var(--y)) scale(0);opacity:0}}
-.premium #particleBurst{display:block!important}
-#particleBurst span{position:absolute;width:7px;height:7px;border-radius:50%;background:#a855f7;box-shadow:0 0 8px rgba(147,51,234,.7);opacity:0}
-#particleBurst.burst span{animation:particleFly .9s ease-out forwards}
-#particleBurst.burst span:nth-child(1){--x:-45px;--y:-35px;animation-delay:0s}
-#particleBurst.burst span:nth-child(2){--x:35px;--y:-45px;animation-delay:.06s}
-#particleBurst.burst span:nth-child(3){--x:55px;--y:15px;animation-delay:.12s}
-#particleBurst.burst span:nth-child(4){--x:-35px;--y:45px;animation-delay:.18s}
-#particleBurst.burst span:nth-child(5){--x:-55px;--y:25px;animation-delay:.24s}
-#particleBurst.burst span:nth-child(6){--x:25px;--y:55px;animation-delay:.3s}
-.premium .primaryBtn{background:linear-gradient(135deg,#9333ea,#a855f7)!important;box-shadow:0 4px 20px rgba(147,51,234,.25)!important}
-.premium .onBtn{background:linear-gradient(135deg,#9333ea,#a855f7)!important;box-shadow:0 4px 20px rgba(147,51,234,.25)!important}
-.premium .hookOn{background:linear-gradient(135deg,#a855f7,#7c3aed)!important;box-shadow:0 4px 20px rgba(147,51,234,.25)!important}
-.premium #proBadge{display:inline!important}
-.premium #headerLine{background:linear-gradient(90deg,#a855f7,#9333ea,#c084fc)!important;width:60px!important;height:3px!important}
-#userMenu > div:not([style*="height"]):hover{background:rgba(255,255,255,.05)}
-#menuBtn:hover{background:rgba(255,255,255,.1)!important}
-@keyframes favPop{0%{transform:scale(1)}30%{transform:scale(1.6)}60%{transform:scale(.85)}100%{transform:scale(1)}}
-@keyframes favFly{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(40px,-80px) scale(.3)}}
-.favPop{animation:favPop .4s cubic-bezier(.4,0,.2,1)!important}
-#flyHeart{position:fixed;z-index:999;font-size:24px;pointer-events:none;opacity:0;transition:none}
-@keyframes swipeLeft{0%{transform:translateX(0);opacity:1}30%{transform:translateX(-25px);opacity:.5}60%{transform:translateX(8px);opacity:.8}100%{transform:translateX(0);opacity:1}}
-@keyframes swipeRight{0%{transform:translateX(0);opacity:1}30%{transform:translateX(25px);opacity:.5}60%{transform:translateX(-8px);opacity:.8}100%{transform:translateX(0);opacity:1}}
-.swipeL .card{animation:swipeLeft .35s ease-out!important}
-.swipeR .card{animation:swipeRight .35s ease-out!important}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#08080f;color:#fff;height:100dvh;display:flex;flex-direction:column;overflow:hidden;touch-action:manipulation}
+#splash{position:fixed;inset:0;background:#08080f;display:flex;align-items:center;justify-content:center;z-index:999;transition:opacity .3s}
+#splash.hide{opacity:0;pointer-events:none}
+#splash h1{font-size:2rem;background:linear-gradient(135deg,#e94560,#ff6b81);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+#splash .sp{width:32px;height:32px;border:3px solid #2a2a4a;border-top-color:#e94560;border-radius:50%;animation:spin .8s linear infinite;margin:1rem auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+header{display:flex;align-items:center;gap:8px;padding:12px 16px;background:#12121e;border-bottom:1px solid #2a2a4a}
+header h1{font-size:1.2rem;flex:1;background:linear-gradient(135deg,#e94560,#ff6b81);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+header button{background:none;border:none;color:#fff;font-size:1.2rem;padding:6px 10px;border-radius:8px;cursor:pointer}
+
+.search-wrap{display:flex;gap:6px;padding:10px 16px}
+.search-wrap input{flex:1;padding:10px 14px;border:1px solid #2a2a4a;border-radius:10px;background:#12121e;color:#fff;font-size:14px;outline:none}
+.search-wrap input:focus{border-color:#e94560}
+.search-wrap button{padding:10px 16px;border:none;border-radius:10px;background:#e94560;color:#fff;cursor:pointer;font-size:14px}
+
+.chips{display:flex;gap:6px;padding:4px 16px;overflow-x:auto;scrollbar-width:none}
+.chip{padding:6px 16px;border-radius:20px;background:#1a1a2e;border:1px solid #2a2a4a;font-size:13px;white-space:nowrap;cursor:pointer;flex-shrink:0}
+.chip.on{background:#e94560;border-color:#e94560}
+
+.list{flex:1;overflow-y:auto;padding:0 16px 16px;display:flex;flex-direction:column;gap:6px}
+.item{display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px;background:#12121e;cursor:pointer;transition:background .2s}
+.item:active{background:#1a1a2e}
+.item .th{width:40px;height:40px;border-radius:6px;background:#2a2a4a;flex-shrink:0;overflow:hidden}
+.item .th img{width:100%;height:100%;object-fit:cover}
+.item .info{flex:1;min-width:0}
+.item .info .t{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .info .a{font-size:12px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+#status{padding:6px 16px;font-size:12px;color:#888;min-height:20px}
+
+.player{display:flex;align-items:center;gap:10px;padding:10px 16px 14px;background:#12121e;border-top:1px solid #2a2a4a}
+.player .th{width:40px;height:40px;border-radius:6px;background:#2a2a4a;flex-shrink:0;overflow:hidden}
+.player .th img{width:100%;height:100%;object-fit:cover}
+.player .info{flex:1;min-width:0}
+.player .info .t{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.player .info .a{font-size:11px;color:#888}
+.player .ctrl{display:flex;gap:6px;align-items:center}
+.player .ctrl button{background:none;border:none;color:#fff;font-size:1.3rem;padding:6px 10px;cursor:pointer;border-radius:8px}
+.player .ctrl .pp{color:#e94560;font-size:1.8rem}
+.player .ctrl button:active{background:rgba(255,255,255,.1)}
+
+.empty{text-align:center;color:#666;padding:2rem;font-size:14px}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1a1a2e;border:1px solid #2a2a4a;color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;z-index:100;transition:opacity .3s;pointer-events:none}
+.toast.hide{opacity:0}
+
+#updateScreen{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:200;background:rgba(0,0,0,.85);backdrop-filter:blur(20px)}
+#updateScreen.show{display:flex}
+.update-box{background:#1a1a2e;border:1px solid #2a2a4a;border-radius:16px;padding:2rem;width:100%;max-width:340px;text-align:center}
+.update-box h2{color:#e94560;margin-bottom:8px}
+.update-box p{color:#888;font-size:13px;margin-bottom:16px}
+.update-box button{width:100%;padding:14px;border:none;border-radius:10px;background:#e94560;color:#fff;font-size:15px;font-weight:600;cursor:pointer}
 </style>
 </head>
 <body>
-<script>try{var _c=JSON.parse(localStorage.getItem('mf_prem')||'{}');if(_c.e&&_c.x>Date.now())document.body.classList.add('premium');}catch(e){}</script>
-<div id="ytWrap"><div id="ytP"></div></div>
-<audio id="audioPlayer" style="display:none"></audio>
-<div id="premiumGlow" style="display:none;position:fixed;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at 50% 50%,rgba(147,51,234,.015) 0%,transparent 50%);pointer-events:none;z-index:-1"></div>
-<div id="micOv"><div class="b">🎤</div><div class="tx" id="micTxt">Listening...</div></div>
-<div id="flyHeart">❤️</div>
 
-<div id="authScrn">
-  <div class="abox">
-    <h2>Mood Player</h2>
-    <p id="authScrnP">sign in with your email</p>
-    <input id="emailInp" type="email" placeholder="your@email.com" autocomplete="email">
-    <input id="passInp" type="password" placeholder="Password (min 6 chars)" autocomplete="current-password">
-    <button id="authBtn" onclick="authClick()">Sign In</button>
-    <div class="link" id="authToggle" onclick="authToggle()">Don't have an account? Sign Up</div>
-    <div class="note" id="authNote">Enter your email & password to start</div>
+<div id="splash"><div><h1>MoodFlow</h1><div class="sp"></div></div></div>
+
+<header>
+  <h1>MoodFlow</h1>
+</header>
+
+<div class="search-wrap">
+  <input id="searchInput" placeholder="Search any song..." autocomplete="off">
+  <button id="searchBtn">Search</button>
+</div>
+
+<div class="chips" id="chipBar">
+  <span class="chip on" data-q="bollywood hits">Bollywood</span>
+  <span class="chip" data-q="punjabi songs">Punjabi</span>
+  <span class="chip" data-q="english hits">English</span>
+  <span class="chip" data-q="lofi chill">Lofi</span>
+  <span class="chip" data-q="romantic songs">Romantic</span>
+  <span class="chip" data-q="party songs">Party</span>
+</div>
+
+<div id="status">Search or tap a mood</div>
+
+<div class="list" id="list"></div>
+
+<div class="player" id="player" style="display:none">
+  <div class="th" id="pth"></div>
+  <div class="info">
+    <div class="t" id="pt">No track</div>
+    <div class="a" id="pa"></div>
+  </div>
+  <div class="ctrl">
+    <button id="prevBtn">&#9664;&#9664;</button>
+    <button id="playBtn" class="pp">&#9654;</button>
+    <button id="nextBtn">&#9654;&#9654;</button>
   </div>
 </div>
 
-<div id="subScrn">
-  <div class="sbox">
-    <h2>Subscription</h2>
-    <div class="price" id="subPrice">41<span style="font-size:14px;opacity:.5">/month</span></div>
-    <div class="perks">
-      <div>Unlimited song playback</div>
-      <div>Voice control (Mic)</div>
-      <div>YouTube search</div>
-      <div>Continuous playback</div>
-      <div>No ads</div>
-    </div>
-    <button id="subPbtn" onclick="paySub()">Pay 41 & Activate</button>
-    <button id="subLater" onclick="closeSub()">Maybe later</button>
+<div id="updateScreen">
+  <div class="update-box">
+    <h2>Update Available</h2>
+    <p id="updateText">New version available</p>
+    <button id="updateBtn" onclick="doUpdate()">Download Update</button>
   </div>
 </div>
 
-<div id="updateScrn" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:160;display:none;justify-content:center;align-items:center;background:rgba(0,0,0,.85);backdrop-filter:blur(40px);flex-direction:column;padding:24px">
-  <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);border-radius:28px;padding:32px;width:100%;max-width:360px;text-align:center;box-shadow:0 8px 48px rgba(0,0,0,.15)">
-    <div style="font-size:48px;margin-bottom:8px">🔄</div>
-    <h2 style="font-size:22px;font-weight:800;margin-bottom:4px">Update Available</h2>
-    <div style="font-size:12px;opacity:.4;margin-bottom:8px" id="updateVersion"></div>
-    <div style="font-size:14px;opacity:.65;margin-bottom:18px" id="updateNotes"></div>
-    <div id="updateProgress" style="font-size:12px;opacity:.4;margin-bottom:10px;display:none">Downloading...</div>
-    <button id="updateBtn" onclick="doUpdate()" style="width:100%;padding:15px;border:none;border-radius:16px;font-size:15px;font-weight:700;color:#fff;cursor:pointer;background:linear-gradient(135deg,#818cf8,#a78bfa);transition:all .25s;box-shadow:0 4px 16px rgba(129,140,248,.2);display:flex;align-items:center;justify-content:center;gap:6px">⬇ Download Update</button>
-  </div>
-</div>
+<div id="toast" class="toast hide"></div>
 
-<div class="container" id="mainApp" style="display:none">
-  <div class="header">
-    <h1>♪ MoodFlow<span id="proBadge" style="display:none;font-size:10px;font-weight:800;vertical-align:super;margin-left:6px;background:linear-gradient(135deg,#9333ea,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:1px">✦ PRO</span></h1>
-    <div id="headerLine" style="width:40px;height:3px;border-radius:4px;margin:6px auto 0;background:linear-gradient(90deg,rgba(129,140,248,.3),rgba(147,51,234,.5))"></div>
-    <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:8px;position:relative">
-      <span id="userInfo" style="font-size:10px;opacity:.5;cursor:default">not signed in</span>
-      <span id="crownBadge" style="display:none;font-size:12px">👑</span>
-      <div id="menuBtn" onclick="toggleMenu()" style="width:32px;height:32px;border-radius:10px;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;font-weight:700;line-height:1;transition:all .15s;position:relative;margin-left:6px;border:1px solid rgba(255,255,255,.04)">⋮</div>
-      <div id="userMenu" style="display:none;position:absolute;top:34px;right:0;background:rgba(16,16,28,.97);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:8px;min-width:210px;z-index:50;box-shadow:0 12px 48px rgba(0,0,0,.6)">
-        <div style="padding:6px 14px 2px;font-size:10px;opacity:.25;letter-spacing:.7px;text-transform:uppercase">Account</div>
-        <div id="menuEmail" style="padding:2px 14px 8px;font-size:13px;opacity:.8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</div>
-        <div style="height:1px;background:rgba(255,255,255,.04);margin:0 8px"></div>
-        <div id="menuSubStatus" style="padding:8px 14px 4px;font-size:11px;display:none"></div>
-        <div id="menuSubAction" style="display:none"></div>
-        <div style="height:1px;background:rgba(255,255,255,.04);margin:6px 8px 4px"></div>
-        <div onclick="menuSwitch()" style="padding:8px 14px;font-size:12px;cursor:pointer;border-radius:10px;transition:all .12s;display:flex;align-items:center;gap:8px">🔄 Switch Account</div>
-        <div onclick="menuSignOut()" style="padding:8px 14px;font-size:12px;cursor:pointer;border-radius:10px;transition:all .12s;color:#fb7185;display:flex;align-items:center;gap:8px">🚪 Sign Out</div>
-      </div>
-    </div>
-  </div>
-  <div class="sRow"><input id="sIn" placeholder="Search any song..." autocomplete="off" oninput="doSearch()"><button id="sBtn" onclick="doSearch()">Go</button></div>
-  <div id="sRes"></div>
-  <div class="row">
-    <select id="mood">
-      <option value="">🎲 Random</option><option value="party">🎉 Party</option><option value="dance">💃 Dance</option>
-      <option value="wedding">💒 Wedding</option><option value="romantic">💕 Romantic</option><option value="chill">😎 Chill</option>
-      <option value="happy">😄 Happy</option><option value="gym">💪 Gym</option><option value="energy">⚡ Energy</option>
-      <option value="trip">🏕️ Trip</option><option value="sad">😢 Sad</option><option value="focus">🎯 Focus</option>
-    </select>
-    <select id="lang"><option value="">🌐 All</option><option value="hindi">🪔 Hindi</option><option value="english">🌍 English</option><option value="punjabi">🪅 Punjabi</option></select>
-  </div>
-  <div class="btnRow">
-    <button id="prevBtn" class="offBtn" onclick="prv()" style="font-size:18px">⏮</button>
-    <button id="playBtn" class="primaryBtn" onclick="doPlay()">Play</button>
-    <button id="nextBtn" class="offBtn" onclick="sk()" style="font-size:18px">⏭</button>
-    <button id="stopBtn" class="offBtn" onclick="stp()">Stop</button>
-    <button id="micBtn" class="offBtn" onclick="toggleMic()">Mic</button>
-  </div>
-  <div class="tRow">
-    <button id="hookBtn" class="hookOn" onclick="toggleHook(false)">Hook Start</button>
-    <button id="fullBtn" class="offBtn" onclick="toggleHook(true)">Full Song</button>
-  </div>
-  <div id="volWrap"><span>Low</span><input id="volSlider" type="range" min="0" max="100" value="80" oninput="volChange()"><span>High</span></div>
-  <button id="queueBtn" class="offBtn" onclick="toggleQueue()" style="width:100%;padding:10px;border:none;border-radius:14px;font-size:12px;font-weight:700;color:#fff;cursor:pointer;margin-bottom:6px;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px">📋 Queue <span id="queueCount" style="opacity:.5;font-weight:400"></span></button>
-  <div id="queuePanel" style="display:none;margin-bottom:8px;max-height:220px;overflow-y:auto;background:rgba(255,255,255,.02);border-radius:18px;padding:4px;border:1px solid rgba(255,255,255,.04)">
-    <div id="queueList"></div>
-  </div>
-  <button id="favListBtn" class="offBtn" onclick="toggleFavList()" style="display:none;width:100%;padding:10px;border:none;border-radius:14px;font-size:12px;font-weight:700;color:#fff;cursor:pointer;margin-bottom:6px;transition:all .2s;align-items:center;justify-content:center;gap:6px">♥ Favorites <span id="favCount" style="opacity:.5;font-weight:400"></span></button>
-  <div id="favPanel" style="display:none;margin-bottom:8px;max-height:220px;overflow-y:auto;background:rgba(255,255,255,.02);border-radius:18px;padding:4px;border:1px solid rgba(255,255,255,.04)">
-    <div id="favListContent"></div>
-  </div>
-  <div id="status">Select mood & play</div>
-  <div class="card">
-    <div id="premiumRibbon" style="display:none;position:absolute;top:10px;right:-30px;width:100px;transform:rotate(45deg);color:#fff;font-size:8px;font-weight:900;text-align:center;padding:3px 0;z-index:5;letter-spacing:1px;text-transform:uppercase;box-shadow:0 2px 8px rgba(0,0,0,.3)">🔮 PREMIUM</div>
-    <div id="visualizer" style="display:none;position:relative;z-index:3;height:18px;align-items:flex-end;justify-content:center;gap:3px;margin:0 auto 4px;max-width:80px">
-      <span style="width:4px;border-radius:2px;background:linear-gradient(to top,#9333ea,#a855f7)"></span>
-      <span style="width:4px;border-radius:2px;background:linear-gradient(to top,#9333ea,#a855f7)"></span>
-      <span style="width:4px;border-radius:2px;background:linear-gradient(to top,#9333ea,#a855f7)"></span>
-      <span style="width:4px;border-radius:2px;background:linear-gradient(to top,#9333ea,#a855f7)"></span>
-      <span style="width:4px;border-radius:2px;background:linear-gradient(to top,#9333ea,#a855f7)"></span>
-    </div>
-    <div id="particleBurst" style="display:none;position:absolute;top:50%;left:50%;z-index:10;pointer-events:none">
-      <span></span><span></span><span></span><span></span><span></span><span></span>
-    </div>
-    <img id="thumb" src="" style="width:72px;height:54px;border-radius:10px;margin:0 auto 8px;display:none;object-fit:cover;border:1px solid rgba(255,255,255,.08)">
-    <div class="tt" id="title" style="position:relative;display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap"><span id="titleTxt">Ready</span><span id="favBtn" style="cursor:pointer;font-size:18px;line-height:1;transition:all .2s;text-shadow:0 0 8px rgba(239,68,68,.3)" onclick="toggleFav()">♡</span></div>
-    <div class="sb" id="sub">Tap Play to start</div>
-    <div id="progW"><div id="prog"></div></div>
-  </div>
-</div>
-
-<script defer src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script defer src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-<script defer src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-<script defer src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script>
-var RAZOR_KEY = 'rzp_test_T2I9lFcxVZWzRc';
-var HOOK_SECONDS = 20;
+// ===== SPLASH HIDE =====
+document.getElementById('splash').classList.add('hide');
 
-var TITLES = {
-  "BddP6PYo2gs":"Kesariya","HqUeSjsYLNU":"Makhna","Umqb9KENgmk":"Tum Hi Ho","284Ov7ysmfA":"Channa Mereya",
-  "AEIVhBS6baE":"Gerua","g0eO74UmRBs":"Kal Ho Naa Ho","Qdz5n1Xe5Qo":"Tera Ban Jaunga",
-  "qoq8B8ThgEM":"Tujh Mein Rab Dikhta Hai","vEe-UgJvUHE":"Raabta","VOLKJJvfAbg":"Bekhayali",
-  "EatzcaVJRMs":"Tera Yaar Hoon Main","SAcpESN_Fk4":"Dil Diyan Gallan","FQS7i2z1CoA":"Main Tera Boyfriend",
-  "sCbbMZ-q4-I":"Lut Gaye","hMy5za-m5Ew":"Filhall","bzW9fmwcmG4":"Daru Badnaam",
-  "GOkJguI8kYc":"Illegal Weapon 2.0","IE8OD5FbU-c":"Garmi","1EadhOBcfI0":"Morni Banke",
-  "VAdGW7QDJiU":"Chaleya","RLzC55ai0eo":"Heeriye","VuG7ge_8I2Y":"Maan Meri Jaan",
-  "YxWlaYCA8MU":"Jhoome Jo Pathaan","huxhqphtDrM":"Besharam Rang","6FURuLYrR_Q":"Ae Dil Hai Mushkil",
-  "hhdSyBHuI88":"Zaalima","YPohR_9v6HA":"Titliaan","yThYwOixjYg":"Punjaaban Song",
-  "NwdQx2P_ytk":"Bijlee Bijlee","w4ClQO0FFQg":"Param Sundari","RgzLnmTaCAU":"Kusu Kusu",
-  "G-XMiVMlLRI":"Dance Meri Rani","DKj5m9cSMZs":"Nadiyon Paar","V7LwfY5U5WI":"Ranjha",
-  "vJQMhj6WYZA":"Barbaadiyan","HkvVaj_28C8":"Dilbar","9LtJYw1eY30":"Kamariya",
-  "k4yXQkG2s1E":"Kala Chashma","_KhQT-LGb-4":"Aankh Maare","WqUXVw0WlXc":"Dilbaro",
-  "vvLBXO94EfA":"Gandi Baat","zuaLWHiRXkg":"Hook Up Song","EsXG4YET4zs":"Husn Hai Suhana",
-  "Yqj1_V90KJo":"Chura Ke Dil Mera","q8gilwzNQEA":"Mere Rashke Qamar","BTRPBiE_1lA":"Tu Hi Yaar Mera",
-  "Jm7Satp7Zqk":"Paniyon Sa","05TA9jNnCdU":"Galti Se Mistake","K-Ts-NFR62o":"Jab Tak",
-  "52deq20h6Q4":"Radha","jCEdTq3j-0U":"Gallan Goodiyan","TFTnJzWRTJ8":"Tere Naal Nachna",
-  "YmXJp4RtBCM":"Proper Patola","fRrkXJu4OeE":"Savage Love","VNs_cCtdbPc":"Brown Munde",
-  "cl0a3i2wFcc":"G.O.A.T.","RKioDWlajvo":"Lehanga","uQ763VvqiEM":"Suit Suit",
-  "YpkJO_GrCo0":"Laung Laachi","8nGFWWJLHio":"Ishare Tera","Hg3-fGEJM9Q":"Naagin Aerial",
-  "d2ofxg8pHfQ":"King Shit","92ydUdqWE1g":"Tunak Tunak Tun","qFkNATtc3mc":"Ghungroo",
-  "kJQP7kiw5Fk":"Despacito","OPf0YbXqDm0":"Shape of You","JGwWNGJdvx8":"See You Again",
-  "RBumgq5yVr0":"Lean On","6FURuLYrR_0":"Cheap Thrills","fRh_vgS2dFE":"Sorry",
-  "YQHsXMglC9Y":"Closer","qFkNATtc3m0":"Uptown Funk","2Vv-BfVoq4":"Sugar",
-  "CevxZvSJLk8":"Party Rock Anthem","Dp2HYRpBpHo":"Gangnam Style","TkHtG":"Something Just Like This",
-  "MNnFq":"Stressed Out","PYZQw":"Believer","SmBVv":"Thunder","MfRuG":"Let Me Love You",
-  "7TRFf7uUfhQ":"Swag Se Swagat","kd5KqlmcHNo":"Breakup Song","p062GuAhsRs":"Baby Ko Bass Pasand",
-  "3SWc5G8Gx7E":"Tareefan","OX_gMEb8wNU":"High Heels","RKhsHGfrFmY":"Crooked",
-  "UVbcaG2tfSE":"Chalti Hai Kya","PaDaoNnOQaM":"Mauja Hi Mauja","Y7G-tYRzwYY":"Subah Hone Na De",
-  "E4ZJxhyAaH8":"Gulabi Season","etTxsRy4Qc0":"Phone Mein","2JBYnvUlAEc":"Dhokha",
-  "aQHoIybttak":"Aakhri Kashish","l75z7FrYRXI":"Muqabla","aGWq4AUtQTE":"Jab Chaye Mera Jadoo",
-  "4eLI7f9-7vo":"Kudi Haryane Vali","II2EO3Nw4m0":"Badtameez Dil","Wd7H311MrWA":"Party All Night",
-  "NTHz9ephYTw":"Kar Gayi Chull","C8kSrkz8Hz8":"Kamli","0gtDICWPTyA":"Nagada Nagada",
-  "ZTmF2v59CtI":"Sheila Ki Jawani","QcQpqWhTBCE":"Chikni Chameli","udra3Mfw2oo":"London Thumakda",
-  "PzcSrkMKDdk":"Halkat Jawani","ruEQPQX90fI":"Character Dheela","TLnwqAarPkM":"Let's Nacho",
-  "EEX_XM6SxmY":"Tamma Tamma","leyEatUq00E":"Hauli Hauli","xdEjptiiZIw":"Jatt Di Akh"
-};
+// ===== STATE =====
+let currentTrack=null,playing=false,audio=null,results=[],queue=[],qIdx=0;
+let user=null,favs=[];
+let nativePlaying=false,updateChecked=false,updateCheckAttempts=0,updateInfo=null;
+const $=id=>document.getElementById(id);
+const API='https://pipedapi.kavin.rocks';
+const toast=(msg)=>{const e=$('toast');if(!e)return;e.textContent=msg;e.classList.remove('hide');clearTimeout(e._h);e._h=setTimeout(()=>e.classList.add('hide'),3000)};
+const err=(msg)=>{toast(msg);$('status').textContent=msg};
 
-var SONGS = {
-  "mood":{
-    "party":["1EadhOBcfI0","yThYwOixjYg","NwdQx2P_ytk","RgzLnmTaCAU","G-XMiVMlLRI","YxWlaYCA8MU","huxhqphtDrM","YmXJp4RtBCM","9LtJYw1eY30","VNs_cCtdbPc","GOkJguI8kYc","k4yXQkG2s1E","_KhQT-LGb-4","vvLBXO94EfA","zuaLWHiRXkg","52deq20h6Q4","jCEdTq3j-0U","Wd7H311MrWA","NTHz9ephYTw","PaDaoNnOQaM","TLnwqAarPkM","EEX_XM6SxmY","l75z7FrYRXI","0gtDICWPTyA","ZTmF2v59CtI","QcQpqWhTBCE","leyEatUq00E","C8kSrkz8Hz8","ruEQPQX90fI","II2EO3Nw4m0"],
-    "dance":["qFkNATtc3mc","cl0a3i2wFcc","RKioDWlajvo","uQ763VvqiEM","Hg3-fGEJM9Q","w4ClQO0FFQg","DKj5m9cSMZs","92ydUdqWE1g","TFTnJzWRTJ8","WqUXVw0WlXc","EsXG4YET4zs","IE8OD5FbU-c","4eLI7f9-7vo","II2EO3Nw4m0","leyEatUq00E","0gtDICWPTyA","udra3Mfw2oo","xdEjptiiZIw"],
-    "romantic":["BddP6PYo2gs","Umqb9KENgmk","Qdz5n1Xe5Qo","qoq8B8ThgEM","vEe-UgJvUHE","VOLKJJvfAbg","EatzcaVJRMs","SAcpESN_Fk4","FQS7i2z1CoA","sCbbMZ-q4-I","RLzC55ai0eo","V7LwfY5U5WI","VAdGW7QDJiU","6FURuLYrR_Q","hhdSyBHuI88","BTRPBiE_1lA","Jm7Satp7Zqk","q8gilwzNQEA","HqUeSjsYLNU","Y7G-tYRzwYY","etTxsRy4Qc0"],
-    "chill":["bzW9fmwcmG4","YpkJO_GrCo0","8nGFWWJLHio","VuG7ge_8I2Y","YPohR_9v6HA","d2ofxg8pHfQ","vJQMhj6WYZA","hMy5za-m5Ew","05TA9jNnCdU","K-Ts-NFR62o","fRrkXJu4OeE","HkvVaj_28C8","Yqj1_V90KJo","E4ZJxhyAaH8"],
-    "wedding":["284Ov7ysmfA","AEIVhBS6baE","g0eO74UmRBs","HqUeSjsYLNU","HkvVaj_28C8","fRrkXJu4OeE","TFTnJzWRTJ8","Yqj1_V90KJo","52deq20h6Q4","jCEdTq3j-0U","WqUXVw0WlXc","RgzLnmTaCAU","SAcpESN_Fk4","FQS7i2z1CoA"],
-    "happy":["cl0a3i2wFcc","VNs_cCtdbPc","1EadhOBcfI0","yThYwOixjYg","YmXJp4RtBCM","92ydUdqWE1g","G-XMiVMlLRI","k4yXQkG2s1E","9LtJYw1eY30","_KhQT-LGb-4","52deq20h6Q4","AEIVhBS6baE","kd5KqlmcHNo"],
-    "gym":["IE8OD5FbU-c","YmXJp4RtBCM","VNs_cCtdbPc","cl0a3i2wFcc","RgzLnmTaCAU","G-XMiVMlLRI","zuaLWHiRXkg","TLnwqAarPkM","l75z7FrYRXI","0gtDICWPTyA","ZTmF2v59CtI","QcQpqWhTBCE","ruEQPQX90fI","C8kSrkz8Hz8","PzcSrkMKDdk","RKhsHGfrFmY","aGWq4AUtQTE"],
-    "energy":["IE8OD5FbU-c","G-XMiVMlLRI","RgzLnmTaCAU","zuaLWHiRXkg","YmXJp4RtBCM","TLnwqAarPkM","Wd7H311MrWA","PaDaoNnOQaM","EEX_XM6SxmY","NTHz9ephYTw","leyEatUq00E","udra3Mfw2oo","l75z7FrYRXI","ruEQPQX90fI","0gtDICWPTyA","ZTmF2v59CtI","QcQpqWhTBCE","C8kSrkz8Hz8","PzcSrkMKDdk","II2EO3Nw4m0","4eLI7f9-7vo","UVbcaG2tfSE","k4yXQkG2s1E","9LtJYw1eY30","GOkJguI8kYc"],
-    "trip":["AEIVhBS6baE","g0eO74UmRBs","SAcpESN_Fk4","jCEdTq3j-0U","BTRPBiE_1lA","Umqb9KENgmk","Jm7Satp7Zqk","VAdGW7QDJiU","aGWq4AUtQTE","UVbcaG2tfSE","4eLI7f9-7vo","leyEatUq00E","Y7G-tYRzwYY","PaDaoNnOQaM","EEX_XM6SxmY","HqUeSjsYLNU","8nGFWWJLHio","VuG7ge_8I2Y","WqUXVw0WlXc"],
-    "sad":["vEe-UgJvUHE","VOLKJJvfAbg","hhdSyBHuI88","YPohR_9v6HA","vJQMhj6WYZA","hMy5za-m5Ew","V7LwfY5U5WI","6FURuLYrR_Q","2JBYnvUlAEc","aQHoIybttak","etTxsRy4Qc0","E4ZJxhyAaH8","p062GuAhsRs","8nGFWWJLHio","K-Ts-NFR62o","05TA9jNnCdU","bzW9fmwcmG4","Yqj1_V90KJo","HkvVaj_28C8","WqUXVw0WlXc"],
-    "focus":["qoq8B8ThgEM","VOLKJJvfAbg","Umqb9KENgmk","Qdz5n1Xe5Qo","284Ov7ysmfA","bzW9fmwcmG4","sCbbMZ-q4-I","BddP6PYo2gs","RLzC55ai0eo","V7LwfY5U5WI","EatzcaVJRMs","6FURuLYrR_Q","vEe-UgJvUHE","VAdGW7QDJiU","Jm7Satp7Zqk","Y7G-tYRzwYY","etTxsRy4Qc0","3SWc5G8Gx7E"]
-  },
-  "all":{
-    "hindi":["BddP6PYo2gs","HqUeSjsYLNU","Umqb9KENgmk","284Ov7ysmfA","AEIVhBS6baE","g0eO74UmRBs","Qdz5n1Xe5Qo","qoq8B8ThgEM","vEe-UgJvUHE","VOLKJJvfAbg","EatzcaVJRMs","SAcpESN_Fk4","FQS7i2z1CoA","sCbbMZ-q4-I","hMy5za-m5Ew","bzW9fmwcmG4","GOkJguI8kYc","IE8OD5FbU-c","1EadhOBcfI0","VAdGW7QDJiU","RLzC55ai0eo","VuG7ge_8I2Y","YxWlaYCA8MU","huxhqphtDrM","6FURuLYrR_Q","hhdSyBHuI88","YPohR_9v6HA","yThYwOixjYg","NwdQx2P_ytk","w4ClQO0FFQg","RgzLnmTaCAU","G-XMiVMlLRI","DKj5m9cSMZs","V7LwfY5U5WI","vJQMhj6WYZA","HkvVaj_28C8","9LtJYw1eY30","k4yXQkG2s1E","_KhQT-LGb-4","WqUXVw0WlXc","vvLBXO94EfA","zuaLWHiRXkg","EsXG4YET4zs","Yqj1_V90KJo","q8gilwzNQEA","BTRPBiE_1lA","Jm7Satp7Zqk","05TA9jNnCdU","K-Ts-NFR62o","52deq20h6Q4","jCEdTq3j-0U","TFTnJzWRTJ8","YmXJp4RtBCM","fRrkXJu4OeE","7TRFf7uUfhQ","kd5KqlmcHNo","p062GuAhsRs","3SWc5G8Gx7E","OX_gMEb8wNU","RKhsHGfrFmY","UVbcaG2tfSE","PaDaoNnOQaM","Y7G-tYRzwYY","E4ZJxhyAaH8","etTxsRy4Qc0","2JBYnvUlAEc","aQHoIybttak","l75z7FrYRXI","aGWq4AUtQTE","4eLI7f9-7vo","II2EO3Nw4m0","Wd7H311MrWA","NTHz9ephYTw","C8kSrkz8Hz8","0gtDICWPTyA","ZTmF2v59CtI","QcQpqWhTBCE","udra3Mfw2oo","PzcSrkMKDdk","ruEQPQX90fI","TLnwqAarPkM","EEX_XM6SxmY","leyEatUq00E","xdEjptiiZIw","8nGFWWJLHio","Hg3-fGEJM9Q","d2ofxg8pHfQ","qFkNATtc3mc","YpkJO_GrCo0"],
-    "english":["kJQP7kiw5Fk","OPf0YbXqDm0","JGwWNGJdvx8","RBumgq5yVr0","6FURuLYrR_0","fRh_vgS2dFE","YQHsXMglC9Y","qFkNATtc3m0","2Vv-BfVoq4","CevxZvSJLk8","Dp2HYRpBpHo","TkHtG","MNnFq","PYZQw","SmBVv","MfRuG"],
-    "punjabi":["VNs_cCtdbPc","cl0a3i2wFcc","RKioDWlajvo","uQ763VvqiEM","YpkJO_GrCo0","8nGFWWJLHio","Hg3-fGEJM9Q","d2ofxg8pHfQ","sCbbMZ-q4-I","bzW9fmwcmG4","hMy5za-m5Ew","92ydUdqWE1g","RKhsHGfrFmY","xdEjptiiZIw","leyEatUq00E","udra3Mfw2oo","C8kSrkz8Hz8","PzcSrkMKDdk","0gtDICWPTyA","TLnwqAarPkM","ruEQPQX90fI"]
-  }
-};
-
-var queue = [];
-var queueIndex = -1;
-var playing = false;
-var player = null;
-var ytReady = false;
-var raf = null;
-var played = {};
-var hookStart = true;
-var nativePlaying = false;
-var updateChecked = false;
-var updateCheckAttempts = 0;
-function todayStr() { return new Date().toISOString().split('T')[0]; }
-var micOn = false;
-var recognition = null;
-var searchTimer = null;
-var savedQueue = [];
-var savedIndex = -1;
-var currentUser = null;
-var userData = null;
-var isSignUp = false;
-var favList = [];
-var lastPlayedId = '';
-
-function id(el) { return document.getElementById(el); }
-function txt(el, v) { var e = id(el); if(e) e.textContent = v; }
-function html(el, v) { var e = id(el); if(e) e.innerHTML = v; }
-function show(el, v) { var e = id(el); if(e) e.style.display = v; }
-function wid(el, v) { var e = id(el); if(e) e.style.width = v; }
-
-function makeSong(videoId) {
-  return {id: videoId, title: TITLES[videoId] || videoId};
-}
-
-function moodOrLang(mood, lang) {
-  return mood ? (mood.charAt(0).toUpperCase() + mood.slice(1)) : (lang ? lang.charAt(0).toUpperCase() + lang.slice(1) : 'All');
-}
-
-function buildQueue(mood, lang) {
-  var pool = [];
-  if(mood && SONGS.mood[mood]) {
-    for(var i = 0; i < SONGS.mood[mood].length; i++) pool.push(makeSong(SONGS.mood[mood][i]));
-  } else if(lang && SONGS.all[lang]) {
-    for(var i = 0; i < SONGS.all[lang].length; i++) pool.push(makeSong(SONGS.all[lang][i]));
-  } else {
-    for(var k in SONGS.all) {
-      for(var i = 0; i < SONGS.all[k].length; i++) pool.push(makeSong(SONGS.all[k][i]));
-    }
-  }
-  var unplayed = [];
-  for(var i = 0; i < pool.length; i++) {
-    if(!played[pool[i].id]) unplayed.push(pool[i]);
-  }
-  if(unplayed.length === 0) {
-    if(mood && !window['_moodSearching_' + mood]) {
-      window['_moodSearching_' + mood] = true;
-      txt('status', '🔍 Searching more ' + mood + ' songs...');
-      fetchMoodSongs(mood);
-    }
-    txt('status', '⟳ All played! Shuffling fresh queue...');
-    unplayed = pool;
-  }
-  for(var i = unplayed.length - 1; i > 0; i--) {
-    var j = Math.floor(Math.random() * (i + 1));
-    var tmp = unplayed[i];
-    unplayed[i] = unplayed[j];
-    unplayed[j] = tmp;
-  }
-  if(document.body.classList.contains('premium') && favList.length > 0) {
-    var favSongs = [];
-    for(var i = 0; i < favList.length; i++) {
-      if(TITLES[favList[i]]) favSongs.push(makeSong(favList[i]));
-    }
-    if(favSongs.length > 0) {
-      var favIds = {};
-      for(var i = 0; i < favSongs.length; i++) favIds[favSongs[i].id] = true;
-      unplayed = unplayed.filter(function(s) { return !favIds[s.id]; });
-      unplayed = favSongs.concat(unplayed);
-    }
-  }
-  if(unplayed.length > 1 && unplayed[0].id === lastPlayedId) {
-    var swap = unplayed.splice(0, 1)[0];
-    unplayed.push(swap);
-  }
-  return unplayed;
-}
-
-function freshQueue() {
-  var m = id('mood');
-  var l = id('lang');
-  return buildQueue(m ? m.value : '', l ? l.value : '');
-}
-
-function searchYT(query, cb) {
-  var url = 'https://iv.melmac.space/api/v1/search?q=' + encodeURIComponent(query);
-  fetch(url).then(function(r) { return r.json(); }).then(function(data) {
-    if(!data || !data.length) { cb(null); return; }
-    var results = [];
-    for(var i = 0; i < data.length; i++) {
-      if(data[i].type === 'video') results.push({id: data[i].videoId, title: data[i].title});
-    }
-    cb(results.length > 0 ? results : null);
-  }).catch(function() { cb(null); });
-}
-
-var MOOD_QUERIES = {
-  party:'best party songs hindi bollywood 2024 2025','dance':'best dance songs hindi bollywood 2024 2025',
-  romantic:'best romantic songs hindi bollywood 2024 2025','chill':'best chill vibe songs hindi bollywood',
-  wedding:'best wedding songs hindi bollywood 2024','happy':'best happy songs hindi bollywood 2024 2025',
-  gym:'best workout motivational songs hindi english','energy':'best energy party songs hindi bollywood',
-  trip:'best travel road trip songs hindi bollywood','sad':'best sad songs hindi bollywood 2024 2025',
-  focus:'best calm focus music instrumental hindi'
-};
-function fetchMoodSongs(mood) {
-  var q = MOOD_QUERIES[mood] || 'best ' + mood + ' songs';
-  var skipWords = ['mashup','remix','mix','cover','rework','dj','live','lyrical','slowed','reverb','peed'];
-  searchYT(q, function(results) {
-    window['_moodSearching_' + mood] = false;
-    if(!results || results.length < 3) { txt('status', 'No more ' + mood + ' songs found'); return; }
-    var added = 0;
-    for(var i = 0; i < results.length; i++) {
-      var vid = results[i].id;
-      var title = (results[i].title || '').toLowerCase();
-      var skip = false;
-      for(var s = 0; s < skipWords.length; s++) { if(title.indexOf(skipWords[s]) > -1) { skip = true; break; } }
-      if(skip) continue;
-      if(!played[vid] && !TITLES[vid]) {
-        TITLES[vid] = results[i].title;
-        if(!SONGS.mood[mood]) SONGS.mood[mood] = [];
-        if(SONGS.mood[mood].indexOf(vid) === -1) {
-          SONGS.mood[mood].push(vid);
-          added++;
-        }
-      }
-    }
-    if(added > 0) {
-      txt('status', '✅ Found ' + added + ' new ' + mood + ' songs! Tap Play to load.');
-    } else {
-      txt('status', '⏳ No fresh ' + mood + ' songs right now, try again later');
-    }
-  });
-}
-
-function doSearch() {
-  var inp = id('sIn');
-  var q = inp ? inp.value : '';
-  var res = id('sRes');
-  q = q.trim();
-  if(!res) return;
-  if(!q) { res.classList.remove('show'); res.innerHTML = ''; return; }
-  if(searchTimer) clearTimeout(searchTimer);
-  searchTimer = setTimeout(function() {
-    searchYT(q, function(results) {
-      if(results && results.length > 0) {
-        showResults(results);
-      } else {
-        res.innerHTML = '<div style="opacity:.3">No results found</div>';
-        res.classList.add('show');
-      }
-    });
-  }, 400);
-}
-
-function showResults(results) {
-  var res = id('sRes');
-  if(!res) return;
-  if(results.length === 1) {
-    res.classList.remove('show');
-    res.innerHTML = '';
-    playSearchResult(results[0]);
-    return;
-  }
-  var html = '';
-  for(var i = 0; i < Math.min(results.length, 10); i++) {
-    var t = results[i].title.replace(/"/g,'&quot;');
-    html += '<div data-id="'+results[i].id+'" data-t="'+t+'" onclick="resultClick(this)">'+t+'</div>';
-  }
-  res.innerHTML = html;
-  res.classList.add('show');
-}
-
-function resultClick(el) {
-  playSearchResult({id: el.dataset.id, title: el.dataset.t});
-  var res = id('sRes');
-  if(res) res.classList.remove('show');
-}
-
-function playSearchResult(sr) {
-  if(savedQueue.length === 0 && queue.length > 0 && queueIndex >= 0) {
-    savedQueue = [].concat(queue);
-    savedIndex = queueIndex;
-  }
-  queue = [{id: sr.id, title: sr.title}];
-  queueIndex = -1;
-  if(ytReady && player) playSong(0);
-}
-
-function triggerBurst() {
-  var b = id('particleBurst');
-  if(!b) return;
-  b.classList.remove('burst');
-  void b.offsetWidth;
-  b.classList.add('burst');
-}
-
-var audioPlayer = document.getElementById('audioPlayer');
-var usingAudio = false;
-var cachedStreamUrls = {};
-var nextAudio = document.createElement('audio');
-nextAudio.preload = 'auto';
-
-function getStreamUrl(vid, cb) {
-  if (window.MediaBridge && window.MediaBridge.getStreamUrl) {
-    var url = window.MediaBridge.getStreamUrl(vid);
-    cb(url);
-  } else {
-    cb(null);
-  }
-}
-
-// Called asynchronously by Java bridge when streaming URL is ready
-function onStreamUrlReady(url, videoId) {
-  if (url && url.length > 10) {
-    cachedStreamUrls[videoId] = url;
-    // Pre-load if this is the next song in queue
-    if (queueIndex + 1 < queue.length && queue[queueIndex + 1].id === videoId) {
-      nextAudio.src = url;
-      nextAudio.load();
-    }
-    // Switch to audio stream if this is current song and not already using audio
-    if (usingAudio === false && queue[queueIndex] && queue[queueIndex].id === videoId) {
-      if (player && player.getPlayerState && player.getPlayerState() === YT.PlayerState.PLAYING) {
-        var cur = 0;
-        try { cur = player.getCurrentTime(); } catch(e) {}
-        if (cur > 3) return;
-      }
-      switchToAudio(videoId, url);
-    }
-  }
-}
-function switchToAudio(videoId, url) {
-  usingAudio = true;
-  nativePlaying = false;
-  audioPlayer.src = url;
-  audioPlayer.volume = (id('volSlider') || {}).value / 100 || 0.8;
-  audioPlayer.currentTime = 0;
-  audioPlayer.play();
-  txt('status', 'Playing (stream)');
-  try { if (player) player.stopVideo(); } catch(e) {}
-  try { if (window.MediaBridge && window.MediaBridge.playStreamingUrl && url) window.MediaBridge.playStreamingUrl(url); } catch(e) {}
-}
-
-function preloadNext(i) {
-  if (i + 1 < queue.length) {
-    var nextId = queue[i + 1].id;
-    if (cachedStreamUrls[nextId]) {
-      nextAudio.src = cachedStreamUrls[nextId];
-      nextAudio.load();
-    } else if (window.MediaBridge && window.MediaBridge.getStreamUrlAsync) {
-      window.MediaBridge.getStreamUrlAsync(nextId);
-    } else {
-      getStreamUrl(nextId, function(url) { if (url) cachedStreamUrls[nextId] = url; });
-    }
-  }
-}
-
-function playSong(i) {
-  if(!queue.length) return;
-  if (i >= queue.length) { queue = freshQueue(); i = 0; }
-  if (i >= queue.length) return;
-  var s = queue[i];
-  queueIndex = i;
-  played[s.id] = 1;
-  lastPlayedId = s.id;
-  txt('titleTxt', s.title || s.id);
-  txt('sub', (i+1) + '/' + queue.length);
-  var th = id('thumb');
-  if(th) { th.src = 'https://img.youtube.com/vi/' + s.id + '/mqdefault.jpg'; th.style.display = 'block'; }
-  paused = false; playing = true; txt('playBtn', '||');
-  startBackgroundService(s.id);
-  nativePlaying = false;
-  var gotNative = false;
-
-  // 1) Try to get streaming URL immediately and create native player
-  if (window.MediaBridge && window.MediaBridge.getStreamUrl) {
-    try {
-      var immUrl = window.MediaBridge.getStreamUrl(s.id);
-      if (immUrl && immUrl.length > 10) {
-        cachedStreamUrls[s.id] = immUrl;
-        usingAudio = true;
-        audioPlayer.src = immUrl;
-        audioPlayer.currentTime = 0;
-        audioPlayer.volume = (id('volSlider') || {}).value / 100 || 0.8;
-        audioPlayer.play();
-        txt('status', 'Playing');
-        try { if (window.MediaBridge.playStreamingUrl) window.MediaBridge.playStreamingUrl(immUrl); } catch(e) {}
-        try { if (player) player.stopVideo(); } catch(e) {}
-        gotNative = true;
-        preloadNext(i);
-        updateMediaSession(s);
-        renderQueue();
-        updateFavBtn(s.id);
-        var favB = id('favBtn');
-        if(favB) favB.style.display = '';
-        if(currentUser && firestoreDb) {
-          var update = {};
-          update['dailyPlays.' + todayStr() + '.' + s.id] = true;
-          firestoreDb.collection('users').doc(currentUser.uid).update(update).catch(function(){});
-        }
-        return;
-      }
-    } catch(e) {}
-  }
-
-  // 2) Cached URL available but sync fetch failed or not available
-  if (cachedStreamUrls[s.id] && !gotNative) {
-    usingAudio = true;
-    audioPlayer.src = cachedStreamUrls[s.id];
-    audioPlayer.currentTime = 0;
-    audioPlayer.volume = (id('volSlider') || {}).value / 100 || 0.8;
-    audioPlayer.play();
-    txt('status', 'Playing');
-    try { if (window.MediaBridge.playStreamingUrl) window.MediaBridge.playStreamingUrl(cachedStreamUrls[s.id]); } catch(e) {}
-    try { if (player) player.stopVideo(); } catch(e) {}
-    gotNative = true;
-    preloadNext(i);
-    updateMediaSession(s);
-    renderQueue();
-    updateFavBtn(s.id);
-    var favB = id('favBtn');
-    if(favB) favB.style.display = '';
-    if(currentUser && firestoreDb) {
-      var update = {};
-      update['dailyPlays.' + todayStr() + '.' + s.id] = true;
-      firestoreDb.collection('users').doc(currentUser.uid).update(update).catch(function(){});
-    }
-    return;
-  }
-
-  // 3) No streaming URL yet - start YouTube iframe for immediate audio
-  updateMediaSession(s);
-  if (ytReady && player) {
-    usingAudio = false;
-    player.loadVideoById({videoId: s.id, startSeconds: hookStart ? HOOK_SECONDS : 0});
-    player.playVideo();
-    if (player.unMute) { player.unMute(); player.setVolume((id('volSlider') || {}).value || 80); }
-    txt('status', 'Playing');
-  }
-  // 4) Request streaming URL asynchronously for native player
-  if (window.MediaBridge && window.MediaBridge.getStreamUrlAsync) {
-    window.MediaBridge.getStreamUrlAsync(s.id);
-  } else {
-    getStreamUrl(s.id, function(url) {
-      if (url && url.length > 10) {
-        cachedStreamUrls[s.id] = url;
-        if (usingAudio === false) {
-          usingAudio = true;
-          audioPlayer.src = url;
-          audioPlayer.volume = (id('volSlider') || {}).value / 100 || 0.8;
-          audioPlayer.play();
-          txt('status', 'Playing (stream)');
-          try { if (window.MediaBridge.playStreamingUrl) window.MediaBridge.playStreamingUrl(url); } catch(e) {}
-          try { if (player) player.stopVideo(); } catch(e) {}
-        }
-      }
-    });
-  }
-  preloadNext(i);
-  renderQueue();
-  updateFavBtn(s.id);
-  var favB = id('favBtn');
-  if(favB) favB.style.display = '';
-  if(currentUser && firestoreDb) {
-    var update = {};
-    update['dailyPlays.' + todayStr() + '.' + s.id] = true;
-    firestoreDb.collection('users').doc(currentUser.uid).update(update).catch(function(){});
-  }
-}
-
-audioPlayer.onended = function() {
-  if (usingAudio) {
-    if (queueIndex + 1 < queue.length) playSong(queueIndex + 1);
-    else { queue = freshQueue(); playSong(0); }
-  }
-};
-audioPlayer.onplay = function() {
-  syncPlaying(true);
-};
-audioPlayer.onpause = function() {
-  syncPlaying(false);
-};
-
-audioPlayer.onerror = function() {
-  // Audio failed, try YouTube fallback
-  if (usingAudio && ytReady && player) {
-    usingAudio = false;
-    var s = queue[queueIndex];
-    if (s) {
-      player.loadVideoById({videoId: s.id, startSeconds: hookStart ? HOOK_SECONDS : 0});
-      setTimeout(function() {
-        if (player && player.unMute) { player.unMute(); player.setVolume((id('volSlider') || {}).value || 80); }
-      }, 200);
-    }
-  }
-};
-
-function doPlay() {
-  if (!ytReady || !player) { txt('status', 'Loading...'); loadYT(); }
-  if (playing) {
-    if (usingAudio) { audioPlayer.pause(); } else if (player) { player.pauseVideo(); }
-    txt('playBtn', 'Play');
-    syncPlaying(false);
-    return;
-  }
-  if (queueIndex >= 0 && queue.length > 0) {
-    if (usingAudio) {
-      audioPlayer.play();
-      audioPlayer.volume = (id('volSlider') || {}).value / 100 || 0.8;
-    } else if (player) {
-      player.playVideo(); player.setVolume((id('volSlider') || {}).value || 80); player.unMute();
-    }
-    txt('playBtn', '||');
-    syncPlaying(true);
-    return;
-  }
-  wid('prog', '0%');
-  var m = id('mood');
-  var l = id('lang');
-  queue = buildQueue(m ? m.value : '', l ? l.value : '');
-  queueIndex = -1;
-  if (!queue.length) { txt('status', 'No songs!'); return; }
-  playSong(0);
-  renderQueue();
-}
-
-function sk() {
-  if (!queue.length) return;
-  stopBgAudio();
-  var c = document.querySelector('.container');
-  if (c) { c.classList.remove('swipeL','swipeR'); void c.offsetWidth; c.classList.add('swipeL'); }
-  if (queueIndex + 1 < queue.length) playSong(queueIndex + 1);
-  else { queue = freshQueue(); playSong(0); }
-  renderQueue();
-}
-function prv() {
-  if (!queue.length) return;
-  stopBgAudio();
-  var c = document.querySelector('.container');
-  if (c) { c.classList.remove('swipeL','swipeR'); void c.offsetWidth; c.classList.add('swipeR'); }
-  if (queueIndex > 0) playSong(queueIndex - 1);
-  else playSong(queue.length - 1);
-  renderQueue();
-}
-
-function stopBgAudio() {
-  try { if (window.MediaBridge && window.MediaBridge.stopBgService) window.MediaBridge.stopBgService(); } catch(e) {}
-  try { audioPlayer.pause(); audioPlayer.src = ''; } catch(e) {}
-  try { if (player) player.stopVideo(); } catch(e) {}
-  usingAudio = false;
-}
-
-function stp() {
-  stopBgAudio();
-  try { if (window.MediaBridge && window.MediaBridge.stopBgService) window.MediaBridge.stopBgService(); } catch(e) {}
-  txt('playBtn', 'Play');
-  txt('status', 'Stopped');
-  wid('prog', '0%');
-  var th = id('thumb'); if(th) th.style.display = 'none';
-  queueIndex = -1;
-  playing = false;
-  if (raf) { clearTimeout(raf); raf = null; }
-  try { navigator.mediaSession.playbackState = 'none'; } catch(ex) {}
-}
-
-// Background service keeps WebView alive for YouTube playback when minimized
-function startBackgroundService(videoId) {
-  if(window.MediaBridge) {
-    window.MediaBridge.startBgService(videoId || '');
-  }
-}
-function stopBackgroundService() {
-  if(window.MediaBridge) {
-    window.MediaBridge.hideMedia();
-  }
-}
-function updateMediaSession(song) {
-  try {
-    if(!song) {
-      navigator.mediaSession.playbackState = 'none';
-      stopBackgroundService();
+// ===== SEARCH =====
+async function search(q){
+  $('status').textContent='Searching...';
+  $('list').innerHTML='<div class="empty">Searching...</div>';
+  try{
+    let r=await fetch(API+'/search?q='+encodeURIComponent(q)+'&filter=videos');
+    if(r.status!==200)throw new Error();
+    let d=await r.json();
+    results=(d.items||[]).map(i=>({id:(i.url||'').split('v=')[1]?.split('&')[0]||'',title:i.title||'Unknown',artist:i.uploaderName||i.uploader||'Unknown',thumb:i.thumbnail||'',dur:i.duration||0}));
+    renderList(results);
+    $('status').textContent=results.length+' songs found';
+  }catch(e){
+    try{
+      let r=await fetch('https://pipedapi.syncpundit.io/search?q='+encodeURIComponent(q)+'&filter=videos');
+      if(r.status!==200)throw new Error();
+      let d=await r.json();
+      results=(d.items||[]).map(i=>({id:(i.url||'').split('v=')[1]?.split('&')[0]||'',title:i.title||'Unknown',artist:i.uploaderName||i.uploader||'Unknown',thumb:i.thumbnail||'',dur:i.duration||0}));
+      renderList(results);
+      $('status').textContent=results.length+' songs found';
       return;
-    }
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: song.title || song.id,
-      artist: 'Mood Player',
-      artwork: [{src: 'https://img.youtube.com/vi/' + song.id + '/mqdefault.jpg', sizes: '320x180', type: 'image/jpeg'}]
-    });
-    navigator.mediaSession.playbackState = 'playing';
-    navigator.mediaSession.setActionHandler('play', function(){ mediaOnPlay(); });
-    navigator.mediaSession.setActionHandler('pause', function(){ mediaOnPause(); });
-    navigator.mediaSession.setActionHandler('nexttrack', function(){ sk(); });
-    navigator.mediaSession.setActionHandler('previoustrack', function(){
-      if(queueIndex > 0) playSong(queueIndex - 1); else if(queue.length) playSong(0);
-    });
-    if(window.MediaBridge) {
-      window.MediaBridge.startBgService(song.id || '');
-    }
-    // Update native notification / lock screen via Capacitor plugin
-    if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.MediaControls) {
-      window.Capacitor.Plugins.MediaControls.updateMedia({
-        title: song.title || song.id,
-        artist: 'Mood Player',
-        playing: true
-      });
-    }
-  } catch(ex) {}
-}
-function syncPlaying(playing) {
-  try { if(window.MediaBridge && window.MediaBridge.setPlaying) window.MediaBridge.setPlaying(playing); } catch(e) {}
-}
-function onNativeAudioStart() {
-  nativePlaying = true;
-  try { if (audioPlayer) audioPlayer.pause(); } catch(e) {}
-  try { if (player) player.stopVideo(); } catch(e) {}
-}
-// Callbacks for native notification / lock screen buttons
-function mediaOnPlay() {
-  if (nativePlaying) { syncPlaying(true); return; }
-  if (usingAudio) { audioPlayer.play(); } else if(player) player.playVideo();
-  syncPlaying(true);
-}
-function mediaOnPause() {
-  if (nativePlaying) { syncPlaying(false); return; }
-  if (usingAudio) { audioPlayer.pause(); } else if(player) player.pauseVideo();
-  syncPlaying(false);
-}
-function mediaOnNext() { if (sk) sk(); }
-function mediaOnPrev() { if(queueIndex > 0) playSong(queueIndex - 1); else if(queue.length) playSong(0); }
-// Keep playback alive when screen locks / app backgrounds
-// Override Page Visibility API - YouTube checks this to auto-pause
-try {
-  var _defProp = Object.defineProperty;
-  _defProp(document, 'hidden', { get: function() { return false; }, configurable: true });
-  _defProp(document, 'webkitHidden', { get: function() { return false; }, configurable: true });
-  _defProp(document, 'visibilityState', { get: function() { return 'visible'; }, configurable: true });
-  _defProp(document, 'webkitVisibilityState', { get: function() { return 'visible'; }, configurable: true });
-} catch(e) {}
-// Force switch from YouTube iframe to streaming URL (for zero-delay background)
-function forceSwitchToStream() {
-  if(usingAudio || !queue[queueIndex]) return;
-  var id = queue[queueIndex].id;
-  if(cachedStreamUrls[id]) {
-    switchToAudio(id, cachedStreamUrls[id]);
-  } else {
-    // Request streaming URL now
-    if(window.MediaBridge && window.MediaBridge.getStreamUrlAsync) {
-      window.MediaBridge.getStreamUrlAsync(id);
-    }
-  }
-}
-var bgTimer = null;
-function startBgWatch() {
-  stopBgWatch();
-  if(window.MediaBridge) return; // native audio doesn't need watchdog
-  bgTimer = setInterval(function(){
-    if(!playing || !player) return;
-    try {
-      var st = player.getPlayerState();
-      if(st === 2 && playing) { player.playVideo(); }
-    } catch(ex) {}
-  }, 2000);
-}
-function stopBgWatch() { if(bgTimer) { clearInterval(bgTimer); bgTimer = null; } }
-// Also try to force-switch when visibility changes
-document.addEventListener('visibilitychange', function(){
-  if(document.hidden) { startBgWatch(); forceSwitchToStream(); }
-  else { stopBgWatch(); }
-}, true);
-
-function toggleFav() {
-  var s = queue[queueIndex];
-  if(!s) return;
-  var id = s.id;
-  var idx = favList.indexOf(id);
-  if(idx > -1) { favList.splice(idx, 1); }
-  else { favList.push(id); favAnimate(id); }
-  updateFavBtn(id);
-  updateFavCount();
-  renderFavList();
-  if(currentUser && firestoreDb) {
-    firestoreDb.collection('users').doc(currentUser.uid).update({favorites: favList}).catch(function(){});
-  }
-}
-function favAnimate(vid) {
-  var b = id('favBtn');
-  if(b) { b.classList.remove('favPop'); void b.offsetWidth; b.classList.add('favPop'); }
-  var fh = id('flyHeart');
-  if(!fh || !b) return;
-  var rect = b.getBoundingClientRect();
-  fh.style.left = (rect.left + rect.width/2 - 12) + 'px';
-  fh.style.top = (rect.top + rect.height/2 - 12) + 'px';
-  fh.style.opacity = '1';
-  fh.style.animation = 'none';
-  void fh.offsetWidth;
-  fh.style.animation = 'favFly .6s ease-out forwards';
-  setTimeout(function() { fh.style.opacity = '0'; fh.style.animation = 'none'; }, 700);
-}
-function updateFavBtn(vid) {
-  var b = id('favBtn');
-  if(!b) return;
-  if(favList.indexOf(vid) > -1) { b.textContent = '♥'; b.style.color = '#ef4444'; }
-  else { b.textContent = '♡'; b.style.color = 'rgba(255,255,255,.5)'; }
-}
-function updateFavCount() {
-  var c = id('favCount');
-  if(c) c.textContent = favList.length ? '(' + favList.length + ')' : '';
-}
-var favListOpen = false;
-function toggleFavList() {
-  favListOpen = !favListOpen;
-  var p = id('favPanel');
-  if(p) p.style.display = favListOpen ? 'block' : 'none';
-  if(favListOpen) renderFavList();
-}
-function renderFavList() {
-  var list = id('favListContent');
-  if(!list) return;
-  if(!favList.length) { list.innerHTML = '<div style="padding:20px;text-align:center;opacity:.2;font-size:12px">No favorites yet ♡</div>'; return; }
-  var html = '';
-  for(var i = 0; i < favList.length; i++) {
-    var vid = favList[i];
-    var title = TITLES[vid] || vid;
-    html += '<div class="qi" onclick="playFav(' + i + ')"><img src="https://img.youtube.com/vi/' + vid + '/default.jpg"><span class="qt">' + title + '</span><span class="qn" onclick="event.stopPropagation();removeFav(' + i + ')" style="color:#ef4444;cursor:pointer;font-size:14px">✕</span></div>';
-  }
-  list.innerHTML = html;
-}
-function playFav(i) {
-  var vid = favList[i];
-  if(!vid) return;
-  queue = [makeSong(vid)];
-  queueIndex = -1;
-  playSong(0);
-  renderQueue();
-  if(id('favPanel')) id('favPanel').style.display = 'none';
-  favListOpen = false;
-}
-function removeFav(i) {
-  if(i >= 0 && i < favList.length) {
-    favList.splice(i, 1);
-    updateFavBtn(queue[queueIndex] ? queue[queueIndex].id : '');
-    updateFavCount();
-    renderFavList();
-    if(currentUser && firestoreDb) {
-      firestoreDb.collection('users').doc(currentUser.uid).update({favorites: favList}).catch(function(){});
-    }
+    }catch(e2){}
+    err('Search failed');
+    $('list').innerHTML='<div class="empty">No results</div>';
   }
 }
 
-var queueOpen = false;
-var buffTimer = null;
-
-function buffTimeout() {
-  buffTimer = null;
-  txt('status', '⏭ Stuck - skipping...');
-  if(queueIndex + 1 < queue.length) playSong(queueIndex + 1);
-  else { queue = freshQueue(); playSong(0); }
-}
-function toggleQueue() {
-  queueOpen = !queueOpen;
-  var p = id('queuePanel');
-  if(p) p.style.display = queueOpen ? 'block' : 'none';
-  if(queueOpen) renderQueue();
-}
-function renderQueue() {
-  var list = id('queueList');
-  var count = id('queueCount');
-  if(count) count.textContent = queue.length ? (queueIndex + 1) + '/' + queue.length : '';
-  if(!list) return;
-  if(!queue.length) { list.innerHTML = '<div style="padding:20px;text-align:center;opacity:.2;font-size:12px">Queue empty</div>'; return; }
-  var html = '';
-  for(var i = 0; i < queue.length; i++) {
-    var s = queue[i];
-    var now = (i === queueIndex) ? ' qiNow' : '';
-    var title = s.title || s.id;
-    var num = (i + 1);
-    if(i === queueIndex) { html += '<div class="qi qiNow" onclick="qiClick('+i+')"><span style="color:#818cf8;font-size:14px">▶</span><span class="qt" style="color:#818cf8;font-weight:600">'+title+'</span><span class="qn" style="opacity:.5">NOW</span></div>'; }
-    else if(i < queueIndex) { html += '<div class="qi" onclick="qiClick('+i+')" style="opacity:.3"><img src="https://img.youtube.com/vi/'+s.id+'/default.jpg"><span class="qt">'+title+'</span><span class="qn">'+num+'</span></div>'; }
-    else { html += '<div class="qi" onclick="qiClick('+i+')"><img src="https://img.youtube.com/vi/'+s.id+'/default.jpg"><span class="qt">'+title+'</span><span class="qn">'+num+'</span></div>'; }
-  }
-  list.innerHTML = html;
-}
-function qiClick(i) {
-  if(i >= 0 && i < queue.length) { if(player && ytReady) playSong(i); }
-  renderQueue();
+function renderList(arr){
+  if(!arr||!arr.length){$('list').innerHTML='<div class="empty">No songs found</div>';return}
+  $('list').innerHTML=arr.map((t,i)=>`<div class="item" data-i="${i}"><div class="th">${t.thumb?`<img src="${t.thumb}">`:''}</div><div class="info"><div class="t">${t.title}</div><div class="a">${t.artist}</div></div></div>`).join('');
+  $('list').querySelectorAll('.item').forEach(el=>{el.onclick=()=>{const i=parseInt(el.dataset.i);if(!isNaN(i))playFromList(i)}});
 }
 
-function toggleHook(full) {
-  hookStart = !full;
-  var hb = id('hookBtn');
-  var fb = id('fullBtn');
-  if(hb) hb.className = hookStart ? 'hookOn' : 'offBtn';
-  if(fb) fb.className = hookStart ? 'offBtn' : 'onBtn';
+function syncPlaying(p){
+  try{if(window.MediaBridge&&window.MediaBridge.setPlaying)window.MediaBridge.setPlaying(p)}catch(e){}
+}
+function onNativeAudioStart(){
+  nativePlaying=true;
+  try{if(audio)audio.pause()}catch(e){}
 }
 
-function volChange() {
-  var v = id('volSlider').value;
-  if (usingAudio) { audioPlayer.volume = v / 100; }
-  else if (player && typeof player.setVolume === 'function') { player.setVolume(v); }
-}
-
-function loadYT() {
-  if(window.YT && window.YT.Player) { onYouTubeIframeAPIReady(); return; }
-  if(document.querySelector('script[src*="youtube.com/iframe_api"]')) return;
-  var tag = document.createElement('script');
-  tag.src = 'https://www.youtube.com/iframe_api';
-  var first = document.getElementsByTagName('script')[0];
-  if(first && first.parentNode) first.parentNode.insertBefore(tag, first);
-}
-var ytRetries = 0;
-
-function onYouTubeIframeAPIReady() {
-  try {
-    player = new YT.Player('ytP', {
-      height: '100%', width: '100%',
-      playerVars: {autoplay: 1, controls: 0, disablekb: 1, fs: 0, modestbranding: 1, iv_load_policy: 3, rel: 0, playsinline: 1},
-      events: {
-        onReady: function() {
-          ytReady = true;
-          ytRetries = 0;
-          try { player.unMute(); } catch(e) {}
-          player.setVolume((id('volSlider') || {}).value || 80);
-          try { player.getIframe().setAttribute('allow', 'autoplay; fullscreen'); } catch(e) {}
-          txt('status', 'Ready');
-        },
-        onStateChange: function(e) {
-          if (usingAudio) return;
-          try {
-            if(e.data === YT.PlayerState.PLAYING) {
-              playing = true;
-              txt('playBtn', '||');
-              try { navigator.mediaSession.playbackState = 'playing'; } catch(ex) {}
-              try { player.unMute(); } catch(ex) {}
-              player.setVolume((id('volSlider') || {}).value || 80);
-              if(buffTimer) { clearTimeout(buffTimer); buffTimer = null; }
-              if(raf) clearTimeout(raf);
-              raf = setTimeout(tick, 2000);
-            } else if(e.data === YT.PlayerState.PAUSED) {
-              playing = false;
-              txt('playBtn', 'Play');
-              try { navigator.mediaSession.playbackState = 'paused'; } catch(ex) {}
-              if(buffTimer) { clearTimeout(buffTimer); buffTimer = null; }
-              if(raf) { clearTimeout(raf); raf = null; }
-            } else if(e.data === YT.PlayerState.ENDED) {
-              playing = false;
-              if(buffTimer) { clearTimeout(buffTimer); buffTimer = null; }
-              if(raf) { clearTimeout(raf); raf = null; }
-              wid('prog', '0%');
-              if(savedQueue.length > 0) {
-                queue = savedQueue; queueIndex = savedIndex; savedQueue = []; savedIndex = -1;
-                if(queueIndex + 1 < queue.length) playSong(queueIndex + 1);
-                else { queue = freshQueue(); playSong(0); }
-                return;
-              }
-              if(queueIndex + 1 < queue.length) playSong(queueIndex + 1);
-              else { queue = freshQueue(); playSong(0); }
-            } else if(e.data === YT.PlayerState.BUFFERING) {
-              txt('status', 'Loading...');
-              if(buffTimer) clearTimeout(buffTimer);
-              buffTimer = setTimeout(buffTimeout, 8000);
-            }
-          } catch(ex) { txt('status', 'State error: ' + ex.message); }
-        },
-        onError: function() {
-          if (usingAudio) return;
-          if(buffTimer) { clearTimeout(buffTimer); buffTimer = null; }
-          if(savedQueue.length > 0) {
-            queue = savedQueue; queueIndex = savedIndex; savedQueue = []; savedIndex = -1;
-            if(queueIndex + 1 < queue.length) setTimeout(function() { playSong(queueIndex + 1); }, 500);
-            else setTimeout(function() { queue = freshQueue(); playSong(0); }, 500);
-            return;
-          }
-          if(queueIndex + 1 < queue.length) setTimeout(function() { playSong(queueIndex + 1); }, 500);
-          else setTimeout(function() { queue = freshQueue(); playSong(0); }, 500);
-        }
-      }
-    });
-  } catch(e) { txt('status', 'Retrying...'); }
-}
-
-function tick() {
-  if (usingAudio) {
-    var d = audioPlayer.duration || 0;
-    var c = audioPlayer.currentTime || 0;
-    if (d > 0) wid('prog', (c / d * 100) + '%');
-  } else if (player && player.getDuration && player.getCurrentTime) {
-    var d = player.getDuration();
-    var c = player.getCurrentTime();
-    if (d > 0) wid('prog', (c / d * 100) + '%');
-  }
-  if (playing) raf = setTimeout(tick, 2000);
-}
-
-var seeking = false;
-function seekStart(e) {
-  seeking = true;
-  seekMove(e);
-}
-function seekMove(e) {
-  if(!seeking) return;
-  var pw = id('progW');
-  if(!pw) return;
-  if(e.touches) e.preventDefault();
-  var rect = pw.getBoundingClientRect();
-  var x = (e.clientX || (e.touches && e.touches[0].clientX) || 0) - rect.left;
-  var pct = Math.max(0, Math.min(1, x / rect.width));
-  if (usingAudio) {
-    var d = audioPlayer.duration || 0;
-    if (d > 0) { audioPlayer.currentTime = pct * d; }
-  } else if (player) {
-    var d = player.getDuration();
-    if(d > 0) player.seekTo(pct * d, true);
-  }
-  wid('prog', (pct * 100) + '%');
-}
-function seekEnd() { seeking = false; }
-var pw = id('progW');
-if(pw) {
-  pw.addEventListener('click', function(e) {
-    var rect = pw.getBoundingClientRect();
-    var x = e.clientX - rect.left;
-    var pct = Math.max(0, Math.min(1, x / rect.width));
-    if (usingAudio) {
-      var d = audioPlayer.duration || 0;
-      if (d > 0) { audioPlayer.currentTime = pct * d; }
-    } else if (player) {
-      var d = player.getDuration();
-      if(d > 0) player.seekTo(pct * d, true);
-    }
-    wid('prog', (pct * 100) + '%');
-  });
-  pw.addEventListener('mousedown', seekStart);
-  pw.addEventListener('mousemove', seekMove);
-  pw.addEventListener('mouseup', seekEnd);
-  pw.addEventListener('mouseleave', seekEnd);
-  pw.addEventListener('touchstart', seekStart, {passive:false});
-  pw.addEventListener('touchmove', seekMove, {passive:false});
-  pw.addEventListener('touchend', seekEnd);
-}
-
-var _sx = 0, _st = 0;
-document.addEventListener('touchstart', function(e) {
-  if (!e.target.closest('.card')) return;
-  if (e.target.closest('#progW')) return;
-  _sx = e.touches[0].screenX;
-  _st = Date.now();
-}, {passive: true});
-document.addEventListener('touchend', function(e) {
-  if (!_sx) return;
-  if (!e.target.closest('.card')) return;
-  if (e.target.closest('#progW')) return;
-  var dx = e.changedTouches[0].screenX - _sx;
-  var dt = Date.now() - _st;
-  _sx = 0;
-  if (dt > 400) return;
-  if (dx > 50) { prv(); return; }
-  if (dx < -50) { sk(); }
-}, {passive: true});
-
-function toggleMic() {
-  if(micOn) {
-    micOn = false;
-    if(recognition) {
-      recognition.onend = null;
-      recognition.onerror = null;
-      try { recognition.abort(); } catch(ex) {}
-      try { recognition.stop(); } catch(ex) {}
-      recognition = null;
-    }
-    show('micOv', 'none');
-    if(id('micBtn')) id('micBtn').className = 'offBtn';
-  } else {
-    micRetryCount = 0;
-    startMic();
+// ===== PLAYBACK =====
+async function getStream(id){
+  try{
+    if(window.MediaBridge){let u=window.MediaBridge.getStreamUrl(id);if(u)return u}
+  }catch(e){}
+  try{
+    let r=await fetch(API+'/streams/'+id);
+    if(r.status!==200)throw new Error();
+    let d=await r.json();
+    let as=d.audioStreams?.find(s=>s.mimeType?.startsWith('audio/webm'))||d.audioStreams?.find(s=>s.mimeType?.startsWith('audio/mp4'))||d.audioStreams?.[0];
+    if(as?.url)return as.url;
+    return d.videoStreams?.[0]?.url||'';
+  }catch(e){
+    try{
+      let r=await fetch('https://pipedapi.syncpundit.io/streams/'+id);
+      let d=await r.json();
+      let as=d.audioStreams?.[0];
+      return as?.url||'';
+    }catch(e2){return''}
   }
 }
 
-var micRetryCount = 0;
-function startMic() {
-  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SR) { txt('status', 'Voice not supported'); return; }
-  recognition = new SR();
-  recognition.continuous = false;
-  recognition.interimResults = true;
-  if(micRetryCount === 0) recognition.lang = 'hi-IN';
-  else if(micRetryCount === 1) recognition.lang = 'en-US';
-  else recognition.lang = 'hi-IN';
-  var gotResult = false;
-  recognition.onresult = function(e) {
-    var text = '';
-    for(var i = 0; i < e.results.length; i++) {
-      if(e.results[i].isFinal) { text += e.results[i][0].transcript; break; }
-    }
-    if(!text) return;
-    gotResult = true;
-    micRetryCount = 0;
-    show('micOv', 'none');
-    if(id('micBtn')) id('micBtn').className = 'offBtn';
-    recognition.onend = null;
-    recognition.onerror = null;
-    try { recognition.stop(); } catch(ex) {}
-    recognition = null;
-    micOn = false;
-    text = text.toLowerCase().trim();
-    if(text.match(/(pause|rok|ruk|stop|band|khatam)/)) {
-      if(text.match(/(pause|rok|ruk)/) && playing && player) { try { player.pauseVideo(); } catch(ex) {} txt('status', 'Paused'); return; }
-      if(text.match(/(stop|band|khatam)/)) { stp(); txt('status', 'Stopped'); return; }
-    }
-    if(text.match(/(skip|next|agle|aage|change)/)) { sk(); txt('status', 'Skipped'); return; }
-    if(text.match(/(play|chalao|bajao|resume)/) && !text.match(/(search|dhund|find)/)) {
-      if(!queue.length || queueIndex === -1) {
-        var m = id('mood');
-        var l = id('lang');
-        queue = buildQueue(m ? m.value : '', l ? l.value : '');
-        if(!queue.length) { txt('status', 'No songs!'); return; }
-        playSong(0); return;
-      }
-      if(playing) { try { player.pauseVideo(); } catch(ex) {} } else { try { player.playVideo(); } catch(ex) {} }
-      return;
-    }
-    var searchQ = text.replace(/^(search|dhund|find|play|chalao|bajao|gaana|song|play)\s+/i, '').trim();
-    if(!searchQ || searchQ.length < 2) { txt('status', 'Say a song or command'); return; }
-    txt('status', 'Searching: ' + searchQ);
-    if(queue.length > 0 && queueIndex >= 0 && savedQueue.length === 0) {
-      savedQueue = [].concat(queue);
-      savedIndex = queueIndex;
-    }
-    searchYT(searchQ, function(results) {
-      if(results && results.length > 0) {
-        queue = [{id: results[0].id, title: results[0].title}];
-        queueIndex = -1;
-        if(ytReady && player) playSong(0);
-      } else {
-        txt('status', 'Not found: ' + searchQ);
-      }
-    });
+async function playTrack(track){
+  if(!track||!track.id){err('Invalid');return}
+  currentTrack=track;playing=true;qIdx=queue.findIndex(t=>t.id===track.id);
+  if(!audio){
+    audio=new Audio();
+    audio.onended=()=>{if(queue.length>1)nextTrack();else{playing=false;updateUI()}};
+    audio.onerror=()=>{if(queue.length>1)nextTrack()};
+    audio.onplay=()=>syncPlaying(true);
+    audio.onpause=()=>syncPlaying(false);
+  }
+  $('status').textContent='Loading...';
+  let u='';
+  try{if(window.MediaBridge){let nu=window.MediaBridge.getStreamUrl(track.id);if(nu)u=nu}}catch(e){}
+  if(!u)u=await getStream(track.id);
+  if(!u){err('Cannot play');playing=false;updateUI();return}
+  try{audio.src=u;await audio.play()}catch(e){err('Play failed');playing=false;updateUI();return}
+  try{if(window.MediaBridge)window.MediaBridge.startBgService(track.id)}catch(e){}
+  try{if(window.MediaBridge&&window.MediaBridge.playStreamingUrl&&u)window.MediaBridge.playStreamingUrl(u)}catch(e){}
+  nativePlaying=false;
+  $('player').style.display='flex';
+  $('pth').innerHTML=track.thumb?`<img src="${track.thumb}">`:'';
+  $('pt').textContent=track.title;
+  $('pa').textContent=track.artist;
+  updateUI();
+  updateMediaSession(track);
+}
+
+function updateUI(){$('playBtn').innerHTML=playing?'&#9646;&#9646;':'&#9654;'}
+
+function togglePlay(){
+  if(!audio||!currentTrack)return;
+  if(nativePlaying){
+    if(playing){
+      if(window.MediaBridge&&window.MediaBridge.stopNativePlayback)window.MediaBridge.stopNativePlayback();
+      nativePlaying=false;playing=false;
+    }else{nativePlaying=false;audio.play().then(()=>{playing=true}).catch(()=>{})}
+    updateUI();syncPlaying(playing);return
+  }
+  if(audio.paused){audio.play();playing=true}else{audio.pause();playing=false}
+  updateUI();syncPlaying(playing)
+}
+
+function nextTrack(){
+  if(queue.length>1){qIdx=(qIdx+1)%queue.length;playTrack(queue[qIdx])}
+  else{
+    let idx=results.findIndex(t=>t.id===(currentTrack?.id));
+    if(idx>=0&&idx<results.length-1)playTrack(results[idx+1]);
+    else if(results.length)playTrack(results[0]);
+    else err('No more songs')
+  }
+}
+
+function prevTrack(){
+  if(queue.length>1){qIdx=(qIdx-1+queue.length)%queue.length;playTrack(queue[qIdx])}
+  else{
+    let idx=results.findIndex(t=>t.id===(currentTrack?.id));
+    if(idx>0)playTrack(results[idx-1]);
+    else if(results.length)playTrack(results[results.length-1])
+  }
+}
+
+function playFromList(i){
+  if(!results[i])return;
+  queue=[];qIdx=0;
+  playTrack(results[i])
+}
+
+function sk(){nextTrack()}
+function prv(){prevTrack()}
+
+// ===== SWIPE =====
+(function(){
+  var sx=0,st=0;
+  document.addEventListener('touchstart',function(e){
+    if(!e.target.closest('.player'))return;
+    sx=e.touches[0].screenX;st=Date.now()
+  },{passive:true});
+  document.addEventListener('touchend',function(e){
+    if(!sx)return;
+    var dx=e.changedTouches[0].screenX-sx,dt=Date.now()-st;
+    sx=0;
+    if(dt>400||Math.abs(dx)<40)return;
+    if(dx>0)prevTrack();else nextTrack()
+  },{passive:true})
+})();
+
+// ===== MEDIA SESSION =====
+function updateMediaSession(track){
+  try{
+    navigator.mediaSession.metadata=new MediaMetadata({title:track.title||'MoodFlow',artist:track.artist||'',artwork:[{src:'https://img.youtube.com/vi/'+track.id+'/mqdefault.jpg',sizes:'320x180',type:'image/jpeg'}]});
+    navigator.mediaSession.playbackState='playing';
+    navigator.mediaSession.setActionHandler('play',function(){mediaOnPlay()});
+    navigator.mediaSession.setActionHandler('pause',function(){mediaOnPause()});
+    navigator.mediaSession.setActionHandler('nexttrack',function(){nextTrack()});
+    navigator.mediaSession.setActionHandler('previoustrack',function(){prevTrack()});
+  }catch(e){}
+}
+
+// ===== NATIVE CALLBACKS =====
+function mediaOnPlay(){
+  if(nativePlaying){syncPlaying(true);return}
+  togglePlay()
+}
+function mediaOnPause(){
+  if(nativePlaying){syncPlaying(false);return}
+  togglePlay()
+}
+function mediaOnNext(){nextTrack()}
+function mediaOnPrev(){prevTrack()}
+
+// ===== EVENT BINDINGS =====
+$('playBtn').onclick=togglePlay;
+$('nextBtn').onclick=nextTrack;
+$('prevBtn').onclick=prevTrack;
+
+document.querySelectorAll('.chip').forEach(c=>{
+  c.onclick=async()=>{
+    document.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));
+    c.classList.add('on');
+    await search(c.dataset.q);
   };
-  recognition.onerror = function() {
-    show('micOv', 'none');
-    if(id('micBtn')) id('micBtn').className = 'offBtn';
-    recognition = null;
-    micOn = false;
-  };
-  recognition.onend = function() {
-    recognition = null;
-    micOn = false;
-    if(!gotResult && micRetryCount < 2) {
-      micRetryCount++;
-      setTimeout(function() { if(!micOn && !recognition) { startMic(); } }, 300);
-      return;
-    }
-    micRetryCount = 0;
-  };
-  try {
-    micOn = true;
-    recognition.start();
-    if(id('micBtn')) id('micBtn').className = 'onBtn';
-    show('micOv', 'flex');
-    txt('micTxt', 'Listening...');
-    txt('status', micRetryCount === 0 ? "Say a song" : "Speak in English");
-  } catch(ex) {
-    txt('status', 'Mic failed');
-    recognition = null;
-    micOn = false;
-    show('micOv', 'none');
-  }
-}
-
-var firebaseAuth = null;
-var firestoreDb = null;
-
-document.addEventListener('DOMContentLoaded', function() {
-  try {
-    firebase.initializeApp({
-      apiKey: 'AIzaSyAFwUYmVsKE_SSxRBoGxsTFFXclJjSAfl0',
-      authDomain: 'yt-mood-player-naman.firebaseapp.com',
-      projectId: 'yt-mood-player-naman',
-      storageBucket: 'yt-mood-player-naman.firebasestorage.app',
-      messagingSenderId: '79051163289',
-      appId: '1:79051163289:web:b65c6b91495678da08'
-    });
-    firebaseAuth = firebase.auth();
-    firestoreDb = firebase.firestore();
-  } catch(e) { txt('authNote', 'Firebase init error: ' + e.message); }
-
-  setTimeout(setupSwipe, 2000);
-  if(firebaseAuth) {
-    firebaseAuth.onAuthStateChanged(function(user) {
-      try {
-        if(user) {
-          currentUser = user;
-          show('authScrn', 'none');
-          setPremium();
-          txt('status', user.email);
-          loadUserData(user.uid);
-          loadYT();
-        } else {
-          showAuth();
-        }
-      } catch(e) { txt('authNote', 'Auth state error: ' + e.message); }
-    });
-  }
 });
 
-function authToggle() {
-  isSignUp = !isSignUp;
-  txt('authScrnP', isSignUp ? 'create a new account' : 'sign in with your email');
-  id('authBtn').textContent = isSignUp ? 'Sign Up' : 'Sign In';
-  id('authToggle').textContent = isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up";
-  txt('authNote', isSignUp ? 'Enter email & password to sign up' : 'Enter your email & password to sign in');
-}
+$('searchBtn').onclick=async()=>{
+  let q=$('searchInput').value.trim();
+  if(!q)return;
+  document.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));
+  await search(q);
+};
+$('searchInput').onkeydown=e=>{if(e.key==='Enter')$('searchBtn').click()};
 
-function authClick() {
-  var email = id('emailInp');
-  var pass = id('passInp');
-  var e = (email || {}).value || '';
-  var p = (pass || {}).value || '';
-  if(!e || !p || p.length < 6) {
-    txt('authNote', 'Enter valid email & password (min 6 chars)');
-    return;
-  }
-  id('authBtn').disabled = true;
-  txt('authNote', 'Processing...');
-  if(isSignUp) {
-    firebaseAuth.createUserWithEmailAndPassword(e, p).then(function() {
-      txt('authNote', 'Account created! Redirecting...');
-    }).catch(function(err) {
-      txt('authNote', 'Sign Up Error: ' + err.message);
-      id('authBtn').disabled = false;
-    });
-  } else {
-    firebaseAuth.signInWithEmailAndPassword(e, p).then(function() {
-      txt('authNote', 'Signed in! Redirecting...');
-    }).catch(function(err) {
-      txt('authNote', 'Sign In Error: ' + err.message);
-      id('authBtn').disabled = false;
-    });
+// ===== AUTO LOAD =====
+setTimeout(()=>search('bollywood hits trending'),500);
+
+// ===== UPDATE CHECK =====
+function checkUpdate(){
+  if(updateChecked||updateCheckAttempts>=10)return;
+  updateCheckAttempts++;
+  if(window.MediaBridge&&window.MediaBridge.checkLatestRelease){
+    window.MediaBridge.checkLatestRelease();
+  }else{
+    setTimeout(checkUpdate,1500);
   }
 }
-
-function showAuth() { show('authScrn', 'flex'); show('mainApp', 'none'); }
-
-var menuOpen = false;
-function toggleMenu() {
-  menuOpen = !menuOpen;
-  var m = id('userMenu');
-  if(m) m.style.display = menuOpen ? 'block' : 'none';
-  var email = id('menuEmail');
-  if(email && currentUser) email.textContent = currentUser.email;
-  if(menuOpen) updateMenuSub();
+function onUpdateCheck(tag,apkUrl,notes){
+  if(updateChecked)return;
+  var curVer=getAppVersion();
+  if(curVer==='0.0.0'||!isNewerVersion(tag,curVer))return;
+  updateChecked=true;updateInfo={tag,apkUrl,notes};
+  $('updateText').textContent='v'+tag.replace(/^v/i,'')+' ready: '+(notes||'Update now');
+  $('updateScreen').classList.add('show');
 }
-function menuSignOut() {
-  closeMenu();
-  signOut();
-}
-function menuSwitch() {
-  closeMenu();
-  signOut();
-}
-function closeMenu() {
-  menuOpen = false;
-  var m = id('userMenu');
-  if(m) m.style.display = 'none';
-}
-document.addEventListener('click', function(e) {
-  if(menuOpen && !e.target.closest('#menuBtn') && !e.target.closest('#userMenu')) closeMenu();
-});
-
-function cachePremium(email, expires) { try { localStorage.setItem('mf_prem', JSON.stringify({e:email,x:expires})); } catch(e) {} }
-function clearPremCache() { try { localStorage.removeItem('mf_prem'); } catch(e) {} }
-function setPremium() {
-  document.body.classList.remove('premium');
-  var badge = id('crownBadge');
-  var menuEmail = id('menuEmail');
-  var favB = id('favBtn');
-  if(favB) favB.style.display = 'none';
-  if(menuEmail && currentUser) menuEmail.textContent = currentUser.email;
-  if(!currentUser) return;
-  if(!id('userInfo').textContent.includes('@')) txt('userInfo', currentUser.email);
-  if(currentUser.email === 'namanmali808@gmail.com') {
-    document.body.classList.add('premium');
-    if(badge) badge.style.display = 'inline';
-    txt('userInfo', currentUser.email);
-    html('userInfo', currentUser.email + ' <span class="sBadge sActive">Lifetime</span>');
-    if(favB) favB.style.display = 'inline';
-    show('favListBtn', 'flex');
-    updateFavCount();
-    return;
-  }
-  var prem = false;
-  try {
-    var c = JSON.parse(localStorage.getItem('mf_prem') || '{}');
-    if(c.e === currentUser.email && c.x > Date.now()) { prem = true; }
-  } catch(e) {}
-  if(userData && userData.expires && userData.expires.toDate) {
-    var exp = userData.expires.toDate().getTime();
-    if(Date.now() <= exp) {
-      prem = true;
-      cachePremium(currentUser.email, exp);
-    } else {
-      clearPremCache();
-    }
-  }
-  if(prem) {
-    document.body.classList.add('premium');
-    if(badge) badge.style.display = 'inline';
-    if(favB) favB.style.display = 'inline';
-    show('favListBtn', 'flex');
-    updateFavCount();
-  }
-  updateMenuSub();
-}
-function updateMenuSub() {
-  var el = id('menuSubStatus');
-  var act = id('menuSubAction');
-  if(!el) return;
-  if(!currentUser) { el.style.display = 'none'; if(act) act.style.display = 'none'; return; }
-  var now = Date.now();
-  if(currentUser.email === 'namanmali808@gmail.com') {
-    el.style.display = 'block';
-    el.innerHTML = '✅ <span style="color:#a78bfa;font-weight:700">✦ Lifetime Premium</span>';
-    if(act) act.style.display = 'none';
-    return;
-  }
-  if(!userData) { el.style.display = 'none'; if(act) act.style.display = 'none'; return; }
-  function subLink(label, desc) {
-    return '<div style="margin-top:4px">' + desc + '</div>' +
-      '<div onclick="closeMenu();id(\'subScrn\').classList.add(\'show\');show(\'subScrn\',\'block\')" style="margin:8px 14px 8px;padding:10px 16px;border-radius:12px;cursor:pointer;text-align:center;background:linear-gradient(135deg,#9333ea,#a855f7);color:#fff;font-weight:700;font-size:12px;letter-spacing:.3px;box-shadow:0 4px 16px rgba(147,51,234,.2)">' + label + '</div>';
-  }
-  if(userData.expires && userData.expires.toDate) {
-    var exp = userData.expires.toDate().getTime();
-    if(now > exp) {
-      el.style.display = 'block';
-      el.innerHTML = '❌ <span style="color:#fb7185">Subscription expired</span>';
-      if(act) act.style.display = 'block';
-      if(act) act.innerHTML = subLink('⭐ Renew Now — ₹41/mo', 'Unlock PRO features again:');
-    } else {
-      var days = Math.ceil((exp - now) / 86400000);
-      var d = new Date(exp);
-      var dateStr = d.getDate() + '/' + (d.getMonth()+1) + '/' + d.getFullYear();
-      el.style.display = 'block';
-      el.innerHTML = '✅ <span style="color:#34d399;font-weight:700">' + days + ' days left</span>' +
-        '<span style="display:block;font-size:10px;opacity:.35;margin-top:2px">till ' + dateStr + '</span>';
-      if(act) act.style.display = 'block';
-      if(act) act.innerHTML = subLink('⚡ Renew Subscription', 'Extend for another month:');
-    }
-  } else if(userData.trialEnd && userData.trialEnd.toDate) {
-    var te = userData.trialEnd.toDate().getTime();
-    if(now > te) {
-      el.style.display = 'block';
-      el.innerHTML = '⏳ <span style="color:#fb7185">Trial ended</span>';
-      if(act) act.style.display = 'block';
-      if(act) act.innerHTML = subLink('⭐ Subscribe Now — ₹41/mo', 'Unlock PRO features, new UI & colors:');
-    } else {
-      var days = Math.ceil((te - now) / 86400000);
-      el.style.display = 'block';
-      el.innerHTML = '⏳ <span style="color:#fbbf24;font-weight:700">Trial: ' + days + ' days left</span>' +
-        '<span style="display:block;font-size:10px;opacity:.35;margin-top:2px">Subscribe to unlock PRO features</span>';
-      if(act) act.style.display = 'block';
-      if(act) act.innerHTML = subLink('⭐ Subscribe Now — ₹41/mo', 'Unlock PRO features, new UI & colors:');
-    }
-  } else {
-    el.style.display = 'block';
-    el.innerHTML = '🔓 <span style="color:rgba(255,255,255,.4)">Free plan</span>';
-    if(act) act.style.display = 'block';
-    if(act) act.innerHTML = subLink('⭐ Subscribe Now — ₹41/mo', 'Unlock PRO features, new UI & colors:');
-  }
-}
-
-setTimeout(function() {
-  checkUpdate();
-}, 3000);
-// Retry update check after auth too
-setTimeout(function() {
-  if(currentUser) checkUpdate();
-}, 8000);
-
-function loadUserData(uid) {
-  if(!firestoreDb) { txt('status', 'Firestore not ready'); return; }
-  played = {};
-  favList = [];
-  queue = [];
-  queueIndex = -1;
-  firestoreDb.collection('users').doc(uid).get().then(function(doc) {
-    if(doc.exists) {
-      userData = doc.data();
-      var now = Date.now();
-      var td = todayStr();
-      if(userData.dailyPlays && userData.dailyPlays[td]) {
-        var todaysPlays = userData.dailyPlays[td];
-        for(var k in todaysPlays) played[k] = 1;
-      }
-      if(userData.favorites && Array.isArray(userData.favorites)) {
-        favList = userData.favorites;
-        updateFavCount();
-      }
-      if(userData.expires && userData.expires.toDate) {
-        var exp = userData.expires.toDate().getTime();
-        if(now > exp) {
-          show('subScrn', 'block');
-          id('subScrn').classList.add('show');
-          txt('status', 'Trial ended. Subscribe to continue.');
-        } else {
-          show('subScrn', 'none');
-          id('subScrn').classList.remove('show');
-          txt('status', 'Subscription Active');
-          setPremium();
-        }
-      } else if(userData.trialEnd && userData.trialEnd.toDate) {
-        var te = userData.trialEnd.toDate().getTime();
-        if(now > te) {
-          if(userData.expires && userData.expires.toDate && now > userData.expires.toDate().getTime()) {
-            show('subScrn', 'block');
-            id('subScrn').classList.add('show');
-            txt('status', 'Trial ended. Subscribe to continue.');
-          } else if(!userData.expires) {
-            show('subScrn', 'block');
-            id('subScrn').classList.add('show');
-            txt('status', 'Trial ended. Subscribe to continue.');
-          } else {
-            show('subScrn', 'none');
-            id('subScrn').classList.remove('show');
-            txt('status', 'Subscription Active');
-            setPremium();
-          }
-        } else {
-          var days = Math.ceil((te - now) / 86400000);
-          html('userInfo', currentUser.email + ' <span class="sBadge sTrial">Trial ' + days + 'd</span>');
-          show('subScrn', 'none');
-          setPremium();
-        }
-      } else if(!userData.trialGiven) {
-        startTrial(uid);
-      } else {
-        show('subScrn', 'block');
-        id('subScrn').classList.add('show');
-        txt('status', 'Trial ended. Subscribe to continue.');
-      }
-    } else {
-      startTrial(uid);
-    }
-    setPremium();
-    show('mainApp', 'block'); setupSwipe();
-  }).catch(function() { show('mainApp', 'block'); setTimeout(setupSwipe,100); txt('status', 'Error loading data'); });
-}
-
-function startTrial(uid) {
-  if(!firestoreDb) { txt('status', 'Firestore not ready'); return; }
-  var te = new Date(Date.now() + 28 * 86400000);
-  firestoreDb.collection('users').doc(uid).set({
-    email: currentUser.email,
-    trialGiven: true,
-    trialEnd: firebase.firestore.Timestamp.fromDate(te),
-    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-  }).then(function() {
-    html('userInfo', currentUser.email + ' <span class="sBadge sTrial">28 days trial</span>');
-    show('subScrn', 'none');
-    txt('status', 'Free trial started! Enjoy 28 days.');
-    setPremium();
-    show('mainApp', 'block'); setupSwipe();
-  });
-}
-
-function paySub() {
-  if(!currentUser) { txt('status', 'Login required'); return; }
-  var opts = {
-    key: RAZOR_KEY,
-    amount: 4100,
-    currency: 'INR',
-    name: 'Mood Player',
-    description: 'Monthly Subscription - 41/month',
-    prefill: { contact: currentUser.email },
-    handler: function(resp) {
-      txt('status', 'Payment verified! Activating...');
-      var nd = new Date(Date.now() + 30 * 86400000);
-      firestoreDb.collection('users').doc(currentUser.uid).update({
-        expires: firebase.firestore.Timestamp.fromDate(nd),
-        lastPayment: firebase.firestore.FieldValue.serverTimestamp(),
-        paymentId: resp.razorpay_payment_id
-      }).then(function() {
-        userData = userData || {};
-        userData.expires = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 30 * 86400000));
-        html('userInfo', currentUser.email + ' <span class="sBadge sActive">Active</span>');
-        show('subScrn', 'none');
-        txt('status', 'Subscription active! 30 days.');
-        setPremium();
-      });
-    },
-    modal: { ondismiss: function() { txt('status', 'Payment cancelled.'); } }
-  };
-  var rzp = new Razorpay(opts);
-  rzp.open();
-}
-
-function closeSub() { show('subScrn', 'none'); txt('status', 'Trial ended. Subscribe to continue.'); }
-
-function signOut() {
-  if(currentUser && confirm('Sign out?')) { clearPremCache(); firebaseAuth.signOut(); }
-}
-
-var updateInfo = null;
-
-function getAppVersion() {
-  try { if(window.MediaBridge && window.MediaBridge.getVersionName) return window.MediaBridge.getVersionName(); } catch(e) {}
+function getAppVersion(){
+  try{if(window.MediaBridge&&window.MediaBridge.getVersionName)return window.MediaBridge.getVersionName()}catch(e){}
   return '0.0.0';
 }
-
-function checkUpdate() {
-  if (updateChecked || updateCheckAttempts >= 10) return;
-  updateCheckAttempts++;
-  if (window.MediaBridge && window.MediaBridge.checkLatestRelease) {
-    window.MediaBridge.checkLatestRelease();
-  } else {
-    setTimeout(checkUpdate, 1500);
-  }
-}
-
-function onUpdateCheck(tag, apkUrl, notes) {
-  if (updateChecked) return;
-  var curVer = getAppVersion();
-  if (curVer === '0.0.0' || !isNewerVersion(tag, curVer)) return;
-  updateChecked = true;
-  updateInfo = { tag: tag, apkUrl: apkUrl, notes: notes };
-  show('updateScrn', 'flex');
-  txt('updateVersion', 'v' + tag.replace(/^v/i, '') + ' available');
-  txt('updateNotes', notes || 'Bug fixes & improvements');
-  id('updateBtn').textContent = '⬇ Download Update';
-  id('updateBtn').disabled = false;
-}
-
-function isNewerVersion(tag, cur) {
-  var a = tag.replace(/^v/i, '').split('.').map(Number);
-  var b = cur.split('.').map(Number);
-  for (var i = 0; i < Math.max(a.length, b.length); i++) {
-    var na = a[i] || 0, nb = b[i] || 0;
-    if (na > nb) return true;
-    if (na < nb) return false;
+function isNewerVersion(tag,cur){
+  var a=tag.replace(/^v/i,'').split('.').map(Number);
+  var b=cur.split('.').map(Number);
+  for(var i=0;i<Math.max(a.length,b.length);i++){
+    var na=a[i]||0,nb=b[i]||0;
+    if(na>nb)return true;
+    if(na<nb)return false;
   }
   return false;
 }
-
-function doUpdate() {
-  if(!updateInfo || !updateInfo.apkUrl) return;
-  var apkUrl = updateInfo.apkUrl;
-  if(window.MediaBridge && window.MediaBridge.downloadApk) {
-    id('updateBtn').textContent = '⏳ Downloading...';
-    id('updateBtn').disabled = true;
-    window.MediaBridge.downloadApk(apkUrl);
+function doUpdate(){
+  if(!updateInfo||!updateInfo.apkUrl)return;
+  if(window.MediaBridge&&window.MediaBridge.downloadApk){
+    window.MediaBridge.downloadApk(updateInfo.apkUrl);
+    $('updateBtn').textContent='Downloading...';
+    $('updateBtn').disabled=true;
     return;
   }
-  id('updateBtn').disabled = true;
-  id('updateBtn').textContent = '⏳ Downloading...';
-  window.location.href = apkUrl;
-  setTimeout(function(){
-    id('updateBtn').textContent = '⬇ Tap retry';
-    id('updateBtn').disabled = false;
-    id('updateNotes').innerHTML = '<a href="' + apkUrl + '" style="color:#818cf8;font-size:16px">📥 Download APK</a>';
-  }, 3000);
+  window.open(updateInfo.apkUrl,'_system');
 }
-function downloadFallback(url) {
-  id('updateBtn').textContent = '⏳ Downloading...';
-  fetch(url).then(function(r){ return r.blob(); }).then(function(blob){
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'MoodFlow.apk';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 2000);
-    id('updateBtn').textContent = '✅ Downloaded! Open file to install.';
-    id('updateBtn').disabled = false;
-  }).catch(function(){
-    id('updateBtn').textContent = '⬇ Download APK';
-    id('updateBtn').disabled = false;
-    id('updateNotes').innerHTML = '<a href="' + url + '" target="_blank" style="color:#818cf8;font-size:16px;text-decoration:underline">Tap here to download APK</a>';
-  });
-}
+setTimeout(checkUpdate,5000);
+setTimeout(checkUpdate,12000);
 
-function closeUpdate() { show('updateScrn', 'none'); }
+console.log('MoodFlow ready');
 </script>
-<script>if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js');</script>
 </body>
 </html>
