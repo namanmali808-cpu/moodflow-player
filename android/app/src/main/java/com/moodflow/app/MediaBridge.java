@@ -400,6 +400,88 @@ public class MediaBridge {
         ctx.startService(intent);
     }
 
+    @JavascriptInterface
+    public String getVersionName() {
+        try {
+            return ctx.getPackageManager().getPackageInfo(ctx.getPackageName(), 0).versionName;
+        } catch (PackageManager.NameNotFoundException e) {
+            return "0.0.0";
+        }
+    }
+
+    @JavascriptInterface
+    public void setPlaying(final boolean playing) {
+        new Handler(ctx.getMainLooper()).post(() -> {
+            Intent intent = new Intent(ctx, MediaPlaybackService.class);
+            intent.setAction("UPDATE_META");
+            intent.putExtra("playing", playing);
+            startService(intent);
+        });
+    }
+
+    @JavascriptInterface
+    public void playStreamingUrl(final String url) {
+        new Handler(ctx.getMainLooper()).post(() -> {
+            Intent intent = new Intent(ctx, MediaPlaybackService.class);
+            intent.setAction("PLAY_STREAM");
+            intent.putExtra("url", url);
+            startService(intent);
+        });
+    }
+
+    @JavascriptInterface
+    public void stopNativePlayback() {
+        new Handler(ctx.getMainLooper()).post(() -> {
+            Intent intent = new Intent(ctx, MediaPlaybackService.class);
+            intent.setAction("com.moodflow.app.media.NATIVE_PAUSE");
+            ctx.startService(intent);
+        });
+    }
+
+    @JavascriptInterface
+    public void checkLatestRelease() {
+        pool.submit(() -> {
+            try {
+                URL url = new URL("https://raw.githubusercontent.com/namanmali808-cpu/moodflow-player/master/latest-release.json");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(15000);
+                conn.connect();
+                if (conn.getResponseCode() != 200) return;
+                String json = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"))
+                    .lines().collect(Collectors.joining("\n"));
+                conn.disconnect();
+                String tagName = extractJsonString(json, "tag_name");
+                String apkUrl = extractJsonString(json, "apk_url");
+                String body = extractJsonString(json, "body");
+                if (tagName.isEmpty() || apkUrl.isEmpty()) return;
+                final String fTag = tagName, fUrl = apkUrl, fBody = body;
+                webView.post(() -> {
+                    try {
+                        String escapedBody = fBody.replace("'", "\\'").replace("\n", "\\n").replace("\r", "");
+                        webView.evaluateJavascript(
+                            "onUpdateCheck('" + fTag + "','" + fUrl + "','" + escapedBody + "')", null);
+                    } catch (Exception ignored) {}
+                });
+            } catch (Exception ignored) {}
+        });
+    }
+
+    private String extractJsonString(String json, String key) {
+        int idx = json.indexOf("\"" + key + "\"");
+        if (idx < 0) return "";
+        int start = json.indexOf("\"", idx + key.length() + 3) + 1;
+        if (start <= 0) return "";
+        StringBuilder sb = new StringBuilder();
+        for (int i = start; i < json.length(); i++) {
+            char c = json.charAt(i);
+            if (c == '\\') { sb.append(json.charAt(i + 1)); i++; }
+            else if (c == '"') break;
+            else sb.append(c);
+        }
+        return sb.toString();
+    }
+
     private void startService(Intent intent) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             ctx.startForegroundService(intent);

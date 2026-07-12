@@ -37,9 +37,8 @@ public class MediaControlsPlugin extends Plugin {
     protected void handleOnPause() {
         super.handleOnPause();
         if (webView != null) {
-            webView.postDelayed(() -> {
-                try { webView.onResume(); } catch (Exception ignored) {}
-            }, 500);
+            try { webView.onResume(); } catch (Exception ignored) {}
+            webView.resumeTimers();
         }
     }
 
@@ -89,12 +88,9 @@ public class MediaControlsPlugin extends Plugin {
             WebView wv = webViewRef != null ? webViewRef : webView;
             if (wv == null) return;
             final String fjs = js;
-            // Try direct evaluateJavascript first
+            try { wv.loadUrl("javascript:" + fjs); return; } catch (Exception ignored) {}
             try { wv.evaluateJavascript(fjs, null); return; } catch (Exception ignored) {}
-            // Fallback: post to WebView thread
-            try { wv.post(() -> { try { wv.evaluateJavascript(fjs, null); } catch (Exception ignored) {} }); return; } catch (Exception ignored) {}
-            // Final fallback: loadUrl javascript:
-            try { wv.post(() -> { try { wv.loadUrl("javascript:" + fjs); } catch (Exception ignored) {} }); } catch (Exception ignored) {}
+            try { wv.post(() -> { try { wv.evaluateJavascript(fjs, null); } catch (Exception ignored) {} }); } catch (Exception ignored) {}
         }
     };
 

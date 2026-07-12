@@ -116,6 +116,7 @@ document.getElementById('splash').classList.add('hide');
 // ===== STATE =====
 let currentTrack=null,playing=false,audio=null,results=[],queue=[],qIdx=0;
 let user=null,favs=[],authFirebase=null,dbFirebase=null;
+let nativePlaying=false,updateChecked=false,updateCheckAttempts=0;
 const API='https://pipedapi.kavin.rocks';
 const $=id=>document.getElementById(id);
 const toast=(msg,t=3000)=>{const e=$('toast');if(!e)return;e.textContent=msg;e.classList.remove('hide');clearTimeout(e._h);e._h=setTimeout(()=>e.classList.add('hide'),t)};
@@ -154,6 +155,14 @@ function renderList(arr){
   $('list').querySelectorAll('.item').forEach(el=>{
     el.onclick=()=>{const i=parseInt(el.dataset.i);if(!isNaN(i))playFromList(i)};
   });
+}
+
+function syncPlaying(p){
+  try{if(window.MediaBridge&&window.MediaBridge.setPlaying)window.MediaBridge.setPlaying(p)}catch(e){}
+}
+function onNativeAudioStart(){
+  nativePlaying=true;
+  try{if(audio)audio.pause()}catch(e){}
 }
 
 // ===== PLAYBACK =====
@@ -197,13 +206,28 @@ async function playTrack(track){
   $('pa').textContent=track.artist;
   $('playBtn').innerHTML='&#9646;&#9646;';
   try{if(window.MediaBridge)window.MediaBridge.startBgService(track.id)}catch(e){}
+  try{if(window.MediaBridge&&window.MediaBridge.playStreamingUrl&&u)window.MediaBridge.playStreamingUrl(u)}catch(e){}
+  nativePlaying=false;
   updateFavBtn();
 }
 
 function togglePlay(){
   if(!audio||!currentTrack)return;
+  if(nativePlaying){
+    if(playing){
+      if(window.MediaBridge&&window.MediaBridge.stopNativePlayback)window.MediaBridge.stopNativePlayback();
+      nativePlaying=false;playing=false;
+    }else{
+      nativePlaying=false;
+      audio.play().then(()=>{playing=true}).catch(()=>{});
+    }
+    $('playBtn').innerHTML=playing?'&#9646;&#9646;':'&#9654;';
+    syncPlaying(playing);
+    return;
+  }
   if(audio.paused){audio.play();playing=true;$('playBtn').innerHTML='&#9646;&#9646;'}
   else{audio.pause();playing=false;$('playBtn').innerHTML='&#9654;'}
+  syncPlaying(playing);
 }
 
 function nextTrack(){
@@ -318,15 +342,52 @@ function initFB(){
 setTimeout(()=>search('bollywood hits trending 2026'),300);
 
 // ===== UPDATE CHECK =====
-fetch('https://raw.githubusercontent.com/namanmali808-cpu/moodflow-player/main/version.json').then(r=>r.json()).then(d=>{
-  if(d.version&&d.version!=='1.8.4'&&d.apkUrl)setTimeout(()=>{
-    if(confirm('Update v'+d.version+' available. Download?')){try{if(window.MediaBridge)window.MediaBridge.downloadApk(d.apkUrl);else window.open(d.apkUrl,'_system')}catch(e){}}
+function checkUpdate(){
+  if(updateChecked||updateCheckAttempts>=10)return;
+  updateCheckAttempts++;
+  if(window.MediaBridge&&window.MediaBridge.checkLatestRelease){
+    window.MediaBridge.checkLatestRelease();
+  }else{
+    setTimeout(checkUpdate,1500);
+  }
+}
+function onUpdateCheck(tag,apkUrl,notes){
+  if(updateChecked)return;
+  var curVer=getAppVersion();
+  if(curVer==='0.0.0'||!isNewerVersion(tag,curVer))return;
+  updateChecked=true;
+  setTimeout(function(){
+    if(confirm('Update v'+tag.replace(/^v/i,'')+' available!\n\n'+notes+'\n\nDownload?')){
+      try{if(window.MediaBridge&&window.MediaBridge.downloadApk)window.MediaBridge.downloadApk(apkUrl);else window.open(apkUrl,'_system')}catch(e){}
+    }
   },8000);
-}).catch(()=>{});
+}
+function getAppVersion(){
+  try{if(window.MediaBridge&&window.MediaBridge.getVersionName)return window.MediaBridge.getVersionName()}catch(e){}
+  return '0.0.0';
+}
+function isNewerVersion(tag,cur){
+  var a=tag.replace(/^v/i,'').split('.').map(Number);
+  var b=cur.split('.').map(Number);
+  for(var i=0;i<Math.max(a.length,b.length);i++){
+    var na=a[i]||0,nb=b[i]||0;
+    if(na>nb)return true;
+    if(na<nb)return false;
+  }
+  return false;
+}
+setTimeout(checkUpdate,5000);
+setTimeout(checkUpdate,12000);
 
 // ===== NATIVE CALLBACKS =====
-function mediaOnPlay(){togglePlay()}
-function mediaOnPause(){togglePlay()}
+function mediaOnPlay(){
+  if(nativePlaying){syncPlaying(true);return}
+  togglePlay()
+}
+function mediaOnPause(){
+  if(nativePlaying){syncPlaying(false);return}
+  togglePlay()
+}
 function mediaOnNext(){nextTrack()}
 function mediaOnPrev(){prevTrack()}
 function sk(){nextTrack()}

@@ -21,15 +21,14 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        initialPlugins.add(AppUpdatePlugin.class);
+        initialPlugins.add(MediaControlsPlugin.class);
         super.onCreate(savedInstanceState);
 
         notifPermissionLauncher = registerForActivityResult(
             new ActivityResultContracts.RequestPermission(),
             result -> {}
         );
-
-        registerPlugin(AppUpdatePlugin.class);
-        registerPlugin(MediaControlsPlugin.class);
 
         injectBridge();
         requestNotifPermission();
@@ -70,6 +69,7 @@ public class MainActivity extends BridgeActivity {
                 ws.setLoadWithOverviewMode(true);
                 ws.setUseWideViewPort(true);
                 wv.addJavascriptInterface(new MediaBridge(MainActivity.this, wv), "MediaBridge");
+                MediaControlsPlugin.webViewRef = wv;
                 return;
             }
         } catch (Exception ignored) {}
