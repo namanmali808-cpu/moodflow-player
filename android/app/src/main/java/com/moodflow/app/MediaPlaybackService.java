@@ -18,7 +18,6 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
-import android.util.Log;
 import android.webkit.WebView;
 
 import androidx.core.app.NotificationCompat;
@@ -50,7 +49,6 @@ public class MediaPlaybackService extends Service {
     private boolean isPlaying = false;
 
     private MediaPlayer mediaPlayer;
-    private String streamUrl;
     private String lastVideoId;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
@@ -60,22 +58,8 @@ public class MediaPlaybackService extends Service {
         createChannel();
         setupAudioManager();
         setupMediaSession();
-        ensureForeground();
+        try { startForeground(NOTIF_ID, buildNotif()); } catch (Exception ignored) {}
         acquireWakeLock();
-    }
-
-    private void ensureForeground() {
-        try {
-            startForeground(NOTIF_ID, buildNotif());
-        } catch (Exception e) {
-            // Retry after a short delay (permission might be granted soon)
-            mainHandler.postDelayed(() -> {
-                try { startForeground(NOTIF_ID, buildNotif()); } catch (Exception ignored) {}
-            }, 2000);
-            mainHandler.postDelayed(() -> {
-                try { startForeground(NOTIF_ID, buildNotif()); } catch (Exception ignored) {}
-            }, 5000);
-        }
     }
 
     private void acquireWakeLock() {
@@ -84,7 +68,7 @@ public class MediaPlaybackService extends Service {
                 PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
                 wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MoodFlow:audio");
             }
-            if (!wakeLock.isHeld()) wakeLock.acquire(10*60*1000L /*10 min timeout to prevent battery drain*/);
+            if (!wakeLock.isHeld()) wakeLock.acquire(30*60*1000L);
         } catch (Exception ignored) {}
     }
 
@@ -122,41 +106,34 @@ public class MediaPlaybackService extends Service {
             mediaSession.setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS | MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS);
             mediaSession.setCallback(new MediaSession.Callback() {
                 @Override public void onPlay() {
-                    new Handler(Looper.getMainLooper()).post(() -> {
+                    mainHandler.post(() -> {
                         if (mediaPlayer != null) { resumePlayback(); }
                         else {
                             execJs("if(window.mediaOnPlay)mediaOnPlay();");
-                            syncStateWithWebView();
                             if (lastVideoId != null) fetchStreamForCurrentVideo();
                         }
                     });
                 }
                 @Override public void onPause() {
-                    new Handler(Looper.getMainLooper()).post(() -> {
+                    mainHandler.post(() -> {
                         if (mediaPlayer != null) { pausePlayback(); }
-                        else {
-                            execJs("if(window.mediaOnPause)mediaOnPause();");
-                            syncStateWithWebView();
-                        }
+                        else { execJs("if(window.mediaOnPause)mediaOnPause();"); }
                     });
                 }
                 @Override public void onSkipToNext() {
-                    new Handler(Looper.getMainLooper()).post(() -> execJs("if(window.mediaOnNext)mediaOnNext();"));
+                    mainHandler.post(() -> execJs("if(window.mediaOnNext)mediaOnNext();"));
                 }
                 @Override public void onSkipToPrevious() {
-                    new Handler(Looper.getMainLooper()).post(() -> execJs("if(window.mediaOnPrev)mediaOnPrev();"));
+                    mainHandler.post(() -> execJs("if(window.mediaOnPrev)mediaOnPrev();"));
                 }
             });
             mediaSession.setActive(true);
             updatePlaybackState();
-        } catch (Exception e) {
-            Log.w("MoodFlow", "MediaSession failed", e);
-        }
+        } catch (Exception ignored) {}
     }
 
     private void playStream(String url) {
         if (url == null || url.isEmpty()) return;
-        streamUrl = url;
         stopPlayback();
         try {
             mediaPlayer = new MediaPlayer();
@@ -181,13 +158,11 @@ public class MediaPlaybackService extends Service {
                 sendBroadcast(new Intent("com.moodflow.app.media.SONG_ENDED"));
             });
             mediaPlayer.setOnErrorListener((mp, what, extra) -> {
-                Log.w("MoodFlow", "MediaPlayer error: " + what + " " + extra);
                 stopPlayback();
                 return true;
             });
             mediaPlayer.prepareAsync();
-        } catch (Exception e) {
-            Log.e("MoodFlow", "playStream failed", e);
+        } catch (Exception ignored) {
             mediaPlayer = null;
         }
     }
@@ -199,7 +174,6 @@ public class MediaPlaybackService extends Service {
             releaseWakeLock();
             updatePlaybackState();
             updateNotification();
-            execJs("if(window.syncPlaying)syncPlaying(false);");
         }
     }
 
@@ -210,7 +184,6 @@ public class MediaPlaybackService extends Service {
             acquireWakeLock();
             updatePlaybackState();
             updateNotification();
-            execJs("if(window.syncPlaying)syncPlaying(true);");
         }
     }
 
@@ -238,23 +211,22 @@ public class MediaPlaybackService extends Service {
     private void execJs(String js) {
         WebView wv = MediaControlsPlugin.webViewRef;
         if (wv == null) return;
-        try { wv.loadUrl("javascript:" + js); return; } catch (Exception ignored) {}
-        try { wv.evaluateJavascript(js, null); return; } catch (Exception ignored) {}
         try { wv.post(() -> { try { wv.evaluateJavascript(js, null); } catch (Exception ignored) {} }); } catch (Exception ignored) {}
-    }
-
-    private void syncStateWithWebView() {
-        execJs("if(window.syncPlaying)syncPlaying(" + isPlaying + ");");
+        try { wv.loadUrl("javascript:" + js); } catch (Exception ignored) {}
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent != null) {
-            String action = intent.getAction();
-            if (ACTION_STOP.equals(action)) {
+        if (intent == null) return START_STICKY;
+        String action = intent.getAction();
+        if (action == null) return START_STICKY;
+
+        switch (action) {
+            case ACTION_STOP:
                 stopPlayback();
                 stopSelf();
-            } else if (ACTION_UPDATE_META.equals(action)) {
+                break;
+            case ACTION_UPDATE_META: {
                 String t = intent.getStringExtra("title");
                 String a = intent.getStringExtra("artist");
                 String vid = intent.getStringExtra("videoId");
@@ -263,41 +235,47 @@ public class MediaPlaybackService extends Service {
                 if (a != null) currentArtist = a;
                 if (vid != null && !vid.isEmpty()) lastVideoId = vid;
                 isPlaying = p;
-                if (isPlaying) { acquireWakeLock(); } else { releaseWakeLock(); }
+                if (isPlaying) acquireWakeLock(); else releaseWakeLock();
                 updateMetadata();
                 updatePlaybackState();
-            } else if (ACTION_START.equals(action)) {
+                break;
+            }
+            case ACTION_START: {
                 String vid = intent.getStringExtra("videoId");
                 if (vid != null && !vid.isEmpty()) lastVideoId = vid;
                 if (mediaPlayer == null && lastVideoId != null) {
                     fetchStreamForCurrentVideo();
                 }
-            } else if (ACTION_PLAY.equals(action)) {
+                break;
+            }
+            case ACTION_PLAY:
                 if (mediaPlayer != null) { resumePlayback(); }
                 else {
                     execJs("if(window.mediaOnPlay)mediaOnPlay();");
-                    syncStateWithWebView();
                     if (lastVideoId != null) fetchStreamForCurrentVideo();
                 }
-            } else if (ACTION_PAUSE.equals(action)) {
+                break;
+            case ACTION_PAUSE:
                 if (mediaPlayer != null) { pausePlayback(); }
-                else {
-                    execJs("if(window.mediaOnPause)mediaOnPause();");
-                    syncStateWithWebView();
-                }
-            } else if (ACTION_PLAY_STREAM.equals(action)) {
+                else { execJs("if(window.mediaOnPause)mediaOnPause();"); }
+                break;
+            case ACTION_PLAY_STREAM: {
                 String url = intent.getStringExtra("url");
                 if (url != null) playStream(url);
-            } else if (ACTION_NATIVE_PAUSE.equals(action)) {
+                break;
+            }
+            case ACTION_NATIVE_PAUSE:
                 stopPlayback();
                 isPlaying = false;
                 updateNotification();
                 updatePlaybackState();
-            } else if (ACTION_NEXT.equals(action)) {
+                break;
+            case ACTION_NEXT:
                 execJs("if(window.mediaOnNext)mediaOnNext();");
-            } else if (ACTION_PREV.equals(action)) {
+                break;
+            case ACTION_PREV:
                 execJs("if(window.mediaOnPrev)mediaOnPrev();");
-            }
+                break;
         }
         try { NotificationManagerCompat.from(this).notify(NOTIF_ID, buildNotif()); } catch (Exception ignored) {}
         return START_STICKY;
@@ -393,7 +371,6 @@ public class MediaPlaybackService extends Service {
     @Override
     public void onTaskRemoved(Intent rootIntent) {
         super.onTaskRemoved(rootIntent);
-        // Keep service alive even if app is swiped from recents
         try {
             Intent restartIntent = new Intent(this, MediaPlaybackService.class);
             restartIntent.setAction(ACTION_START);

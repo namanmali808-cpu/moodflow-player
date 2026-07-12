@@ -30,7 +30,8 @@ public class MediaControlsPlugin extends Plugin {
 
     private boolean permissionRequested = false;
     private WebView webView;
-    
+    private boolean receiverRegistered = false;
+
     public static WebView webViewRef = null;
 
     @Override
@@ -49,8 +50,9 @@ public class MediaControlsPlugin extends Plugin {
 
         requestNotifPermission();
 
-        // Re-register on reload to refresh webViewRef
-        try { getContext().getApplicationContext().unregisterReceiver(forwardReceiver); } catch (Exception ignored) {}
+        if (receiverRegistered) {
+            try { getContext().getApplicationContext().unregisterReceiver(forwardReceiver); } catch (Exception ignored) {}
+        }
         IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_PLAY);
         filter.addAction(ACTION_PAUSE);
@@ -60,7 +62,20 @@ public class MediaControlsPlugin extends Plugin {
         filter.addAction(AUDIO_STARTED);
         int flags = 0;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) flags = Context.RECEIVER_NOT_EXPORTED;
-        getContext().getApplicationContext().registerReceiver(forwardReceiver, filter, flags);
+        try {
+            getContext().getApplicationContext().registerReceiver(forwardReceiver, filter, flags);
+            receiverRegistered = true;
+        } catch (Exception ignored) {}
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        super.handleOnDestroy();
+        if (receiverRegistered) {
+            try { getContext().getApplicationContext().unregisterReceiver(forwardReceiver); } catch (Exception ignored) {}
+            receiverRegistered = false;
+        }
+        if (webViewRef == webView) webViewRef = null;
     }
 
     private void requestNotifPermission() {
@@ -77,20 +92,18 @@ public class MediaControlsPlugin extends Plugin {
         @Override
         public void onReceive(Context context, Intent intent) {
             String a = intent.getAction();
-            String js = null;
+            WebView wv = webViewRef != null ? webViewRef : webView;
+            if (wv == null || a == null) return;
+            final String js;
             if (ACTION_PLAY.equals(a)) js = "if(window.mediaOnPlay)mediaOnPlay();";
             else if (ACTION_PAUSE.equals(a)) js = "if(window.mediaOnPause)mediaOnPause();";
             else if (ACTION_NEXT.equals(a)) js = "if(window.mediaOnNext)mediaOnNext();";
             else if (ACTION_PREV.equals(a)) js = "if(window.mediaOnPrev)mediaOnPrev();";
             else if (SONG_ENDED.equals(a)) js = "if(window.sk)sk();";
             else if (AUDIO_STARTED.equals(a)) js = "if(window.onNativeAudioStart)onNativeAudioStart();";
-            if (js == null) return;
-            WebView wv = webViewRef != null ? webViewRef : webView;
-            if (wv == null) return;
-            final String fjs = js;
-            try { wv.loadUrl("javascript:" + fjs); return; } catch (Exception ignored) {}
-            try { wv.evaluateJavascript(fjs, null); return; } catch (Exception ignored) {}
-            try { wv.post(() -> { try { wv.evaluateJavascript(fjs, null); } catch (Exception ignored) {} }); } catch (Exception ignored) {}
+            else return;
+            try { wv.post(() -> { try { wv.evaluateJavascript(js, null); } catch (Exception ignored) {} }); } catch (Exception ignored) {}
+            try { wv.loadUrl("javascript:" + js); } catch (Exception ignored) {}
         }
     };
 

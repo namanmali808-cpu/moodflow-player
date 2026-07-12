@@ -461,9 +461,8 @@ public class MediaBridge {
                 final String fTag = tagName, fUrl = apkUrl, fBody = body;
                 webView.post(() -> {
                     try {
-                        String escapedBody = fBody.replace("'", "\\'").replace("\n", "\\n").replace("\r", "");
                         webView.evaluateJavascript(
-                            "onUpdateCheck('" + fTag + "','" + fUrl + "','" + escapedBody + "')", null);
+                            "onUpdateCheck('" + fTag + "','" + fUrl + "')", null);
                     } catch (Exception ignored) {}
                 });
             } catch (Exception ignored) {}

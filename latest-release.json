@@ -1,1 +1,1 @@
-{"tag_name":"v1.9.2","apk_url":"https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.9.2/MoodFlow-v1.9.2.apk","body":"FIX: playTrack Promise .catch() added, no more silent failures, toast on error"}
+{"tag_name":"v1.9.3","apk_url":"https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.9.3/MoodFlow-v1.9.3.apk","body":"FIX: swipe, background playback, notification controls, voice search, stability"}

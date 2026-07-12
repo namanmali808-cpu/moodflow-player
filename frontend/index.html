@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>MoodFlow Music</title>
+<title>MoodFlow</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#08080f;color:#fff;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
@@ -14,6 +14,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#08080f;
 @keyframes spin{to{transform:rotate(360deg)}}
 header{display:flex;align-items:center;gap:8px;padding:12px 16px;background:#12121e;border-bottom:1px solid #2a2a4a}
 header h1{font-size:1.2rem;flex:1;background:linear-gradient(135deg,#e94560,#ff6b81);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+header #micBtn{background:none;border:none;color:#888;font-size:1.3rem;padding:6px 10px;cursor:pointer;border-radius:8px;transition:color .3s}
+header #micBtn.active{color:#e94560;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .search-wrap{display:flex;gap:6px;padding:10px 16px}
 .search-wrap input{flex:1;padding:10px 14px;border:1px solid #2a2a4a;border-radius:10px;background:#12121e;color:#fff;font-size:14px;outline:none}
 .search-wrap input:focus{border-color:#e94560}
@@ -47,15 +50,19 @@ header h1{font-size:1.2rem;flex:1;background:linear-gradient(135deg,#e94560,#ff6
 #updateScreen.show{display:flex}
 .update-box{background:#1a1a2e;border:1px solid #2a2a4a;border-radius:16px;padding:2rem;width:100%;max-width:340px;text-align:center}
 .update-box h2{color:#e94560;margin-bottom:8px}
-.update-box p{color:#888;font-size:13px;margin-bottom:16px}
+.update-box p{color:#888;font-size:13px;margin-bottom:16px;line-height:1.4}
 .update-box button{width:100%;padding:14px;border:none;border-radius:10px;background:#e94560;color:#fff;font-size:15px;font-weight:600;cursor:pointer}
+.update-box button:disabled{opacity:.5;cursor:default}
 </style>
 </head>
 <body>
 
 <div id="splash"><div><h1>MoodFlow</h1><div class="sp"></div></div></div>
 
-<header><h1>MoodFlow</h1></header>
+<header>
+  <h1>MoodFlow</h1>
+  <button id="micBtn" onclick="toggleMic()">&#127908;</button>
+</header>
 
 <div class="search-wrap">
   <input id="si" placeholder="Search any song..." autocomplete="off">
@@ -75,69 +82,85 @@ header h1{font-size:1.2rem;flex:1;background:linear-gradient(135deg,#e94560,#ff6
 
 <div class="list" id="list"></div>
 
-<div class="player" id="player" style="display:none" ontouchstart="swipeStart(event)" ontouchend="swipeEnd(event)">
+<div class="player" id="player" style="display:none">
   <div class="th" id="pth"></div>
   <div class="info">
     <div class="t" id="pt">No track</div>
     <div class="a" id="pa"></div>
   </div>
   <div class="ctrl">
-    <button onclick="prevTrack()">◄◄</button>
-    <button class="pp" id="pp" onclick="togglePlay()">►</button>
-    <button onclick="nextTrack()">►►</button>
+    <button onclick="doPrev()">◄◄</button>
+    <button class="pp" id="pp" onclick="doTogglePlay()">►</button>
+    <button onclick="doNext()">►►</button>
   </div>
 </div>
 
 <div id="updateScreen">
   <div class="update-box">
     <h2>Update Available</h2>
-    <p id="ut">New version available. Please update to continue.</p>
-    <button onclick="doUpdate()">Update Now</button>
+    <p id="ut">A new version is available.</p>
+    <button id="updateBtn" onclick="doUpdate()">Update</button>
   </div>
 </div>
 
 <div id="toast" class="toast hide"></div>
 
 <script>
-// ===== UTILS =====
+(function(){
+"use strict";
+
 var currentTrack=null,currentIdx=-1,playing=false,audio=null,results=[],queue=[],qIdx=0;
-var nativePlaying=false,updateChecked=false,updateAttempts=0,updateInfo=null;
-var swiping=false,swipeX=0;
-var loadingTrack=false;
+var nativePlaying=false,updateChecked=false,updateInfo=null;
+var recog=null,recogActive=false;
+
 function $(i){return document.getElementById(i)}
-function toast(m){var e=$('toast');if(!e)return;e.textContent=m;e.classList.remove('hide');clearTimeout(e._h);e._h=setTimeout(function(){e.classList.add('hide')},3000)}
-function err(m){toast(m);$('st').textContent=m}
+
+function toast(m){
+  var e=$('toast');
+  if(!e)return;
+  e.textContent=m;
+  e.classList.remove('hide');
+  clearTimeout(e._t);
+  e._t=setTimeout(function(){e.classList.add('hide')},3000);
+}
+
+function err(m){toast(m);var s=$('st');if(s)s.textContent=m}
+
+function updateStatus(m){var s=$('st');if(s)s.textContent=m}
+
+// ===== SPLASH =====
+$('splash').classList.add('hide');
 
 // ===== SEARCH =====
 function search(q){
-  $('st').textContent='Searching...';
+  updateStatus('Searching...');
   $('list').innerHTML='<div class="empty">Searching...</div>';
   var u='https://pipedapi.kavin.rocks/search?q='+encodeURIComponent(q)+'&filter=videos';
   fetch(u).then(function(r){
-    if(r.status!==200)throw Error();
+    if(r.status!==200)throw Error('HTTP '+r.status);
     return r.json();
   }).then(function(d){
     results=(d.items||[]).map(function(i){
       var vid='';
       try{vid=i.url.split('v=')[1].split('&')[0]}catch(e){}
-      return{id:vid,title:i.title||'Unknown',artist:i.uploaderName||i.uploader||'Unknown',thumb:i.thumbnail||'',dur:i.duration||0}
+      return{id:vid,title:i.title||'Unknown',artist:i.uploaderName||i.uploader||'Unknown',thumb:i.thumbnail||''};
     });
     renderList(results);
-    $('st').textContent=results.length+' songs found';
+    updateStatus(results.length+' songs found');
   }).catch(function(){
-    fetch('https://pipedapi.syncpundit.io/search?q='+encodeURIComponent(q)+'&filter=videos').then(function(r){
-      if(r.status!==200)throw Error();
+    return fetch('https://pipedapi.syncpundit.io/search?q='+encodeURIComponent(q)+'&filter=videos').then(function(r){
+      if(r.status!==200)throw Error('HTTP '+r.status);
       return r.json();
     }).then(function(d){
       results=(d.items||[]).map(function(i){
         var vid='';
         try{vid=i.url.split('v=')[1].split('&')[0]}catch(e){}
-        return{id:vid,title:i.title||'Unknown',artist:i.uploaderName||i.uploader||'Unknown',thumb:i.thumbnail||'',dur:i.duration||0}
+        return{id:vid,title:i.title||'Unknown',artist:i.uploaderName||i.uploader||'Unknown',thumb:i.thumbnail||''};
       });
       renderList(results);
-      $('st').textContent=results.length+' songs found';
-    }).catch(function(){
-      err('Search failed');
+      updateStatus(results.length+' songs found');
+    }).catch(function(e){
+      err('Search failed: '+e.message);
       $('list').innerHTML='<div class="empty">Search failed</div>';
     });
   });
@@ -148,9 +171,14 @@ function renderList(arr){
   var h='';
   for(var i=0;i<arr.length;i++){
     var t=arr[i];
-    h+='<div class="item" onclick="playFromList('+i+')"><div class="th">'+(t.thumb?'<img src="'+t.thumb+'">':'')+'</div><div class="info"><div class="t">'+t.title+'</div><div class="a">'+t.artist+'</div></div></div>';
+    h+='<div class="item" onclick="playFromList('+i+')"><div class="th">'+(t.thumb?'<img src="'+t.thumb+'">':'')+'</div><div class="info"><div class="t">'+escapeHtml(t.title)+'</div><div class="a">'+escapeHtml(t.artist)+'</div></div></div>';
   }
   $('list').innerHTML=h;
+}
+
+function escapeHtml(s){
+  if(!s)return'';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // ===== STREAM =====
@@ -160,7 +188,7 @@ function getStream(id){
       if(window.MediaBridge){var u=window.MediaBridge.getStreamUrl(id);if(u){resolve(u);return}}
     }catch(e){}
     fetch('https://pipedapi.kavin.rocks/streams/'+id).then(function(r){
-      if(r.status!==200)throw Error();
+      if(r.status!==200)throw Error('HTTP '+r.status);
       return r.json();
     }).then(function(d){
       var as=d.audioStreams;
@@ -183,63 +211,59 @@ function getStream(id){
 
 // ===== PLAYBACK =====
 function playTrack(track){
-  if(!track||!track.id){err('Invalid');return}
-  currentTrack=track;playing=true;
-  qIdx=-1;
-  for(var i=0;i<queue.length;i++){if(queue[i].id===track.id){qIdx=i;break}}
-  
-  $('player').style.display='flex';
-  $('pth').innerHTML=track.thumb?'<img src="'+track.thumb+'">':'';
-  $('pt').textContent=track.title;
-  $('pa').textContent=track.artist;
-  updateUI();
-  updateMediaSession(track);
-  $('st').textContent='Loading stream...';
-  
-  getStream(track.id).then(function(u){
-    if(!u){err('Cannot get stream');playing=false;updateUI();return}
-    $('st').textContent='Starting playback...';
-    nativePlaying=false;
-    var hasNative=false;
-    try{
-      if(window.MediaBridge){
-        window.MediaBridge.startBgService(track.id);
-        window.MediaBridge.playStreamingUrl(u);
-        hasNative=true;
-      }
-    }catch(e){}
-    if(!hasNative){
-      if(!audio){
-        audio=new Audio();
-        audio.onended=function(){
-          if(queue.length>1)nextTrack();
-          else{playing=false;updateUI()}
-        };
-        audio.onerror=function(){
-          if(queue.length>1)nextTrack()
-        };
-      }
-      try{audio.src=u;audio.play();$('st').textContent='Playing'}catch(e){err('Play failed')}
-    }else{
-      $('st').textContent='Playing (native)'
-    }
-  }).catch(function(e){
-    err('Failed to load: '+(e.message||'unknown'))
-  });
+  try{
+    if(!track||!track.id){err('Invalid track');return false}
+    currentTrack=track;
+    playing=true;
+    $('player').style.display='flex';
+    $('pth').innerHTML=track.thumb?'<img src="'+track.thumb+'">':'';
+    $('pt').textContent=track.title;
+    $('pa').textContent=track.artist;
+    doUpdateUI();
+    doUpdateMediaSession(track);
+    updateStatus('Loading stream...');
+    getStream(track.id).then(function(u){
+      try{
+        if(!u){err('Cannot get stream URL');playing=false;doUpdateUI();return}
+        updateStatus('Starting playback...');
+        nativePlaying=false;
+        var hasNative=false;
+        try{
+          if(window.MediaBridge){
+            window.MediaBridge.startBgService(track.id);
+            window.MediaBridge.playStreamingUrl(u);
+            hasNative=true;
+          }
+        }catch(e){}
+        if(!hasNative){
+          if(!audio){
+            audio=new Audio();
+            audio.onended=function(){try{if(queue.length>1)doNext();else{playing=false;doUpdateUI()}}catch(e){}};
+            audio.onerror=function(){try{if(queue.length>1)doNext()}};
+          }
+          try{audio.src=u;audio.play();updateStatus('Playing')}catch(e){err('Play failed: '+e.message)}
+        }else{
+          updateStatus('Playing')
+        }
+      }catch(e){err('Playback error: '+e.message)}
+    }).catch(function(e){
+      err('Stream error: '+(e.message||'unknown'));
+      playing=false;
+      doUpdateUI();
+    });
+    return true;
+  }catch(e){err('playTrack: '+e.message);return false}
 }
 
-function updateUI(){
+function doUpdateUI(){
   try{
     var btn=$('pp');
     if(btn)btn.innerHTML=playing?'⏸':'►';
-    if(currentTrack&&playing){
-      var st=$('st');
-      if(st)st.textContent='Playing: '+currentTrack.title;
-    }
+    if(currentTrack&&playing)updateStatus(currentTrack.title)
   }catch(e){}
 }
 
-function togglePlay(){
+function doTogglePlay(){
   try{
     if(!currentTrack){toast('No track loaded');return}
     if(nativePlaying){
@@ -247,55 +271,57 @@ function togglePlay(){
         if(window.MediaBridge&&window.MediaBridge.stopNativePlayback){
           window.MediaBridge.stopNativePlayback();
           playing=false;nativePlaying=false;
-          updateUI();syncPlaying(false);
-          return
+          doUpdateUI();syncPlaying(false);
+          return;
         }
       }catch(e){}
       nativePlaying=false;
       if(audio){if(audio.paused){audio.play();playing=true}else{audio.pause();playing=false}}
-      syncPlaying(playing);updateUI();return
+      syncPlaying(playing);doUpdateUI();return;
     }
     if(window.MediaBridge&&window.MediaBridge.setPlaying){
       playing=!playing;
       window.MediaBridge.setPlaying(playing);
-      updateUI();return
+      doUpdateUI();return;
     }
     if(!audio){toast('Audio not ready');return}
     if(audio.paused){audio.play();playing=true}else{audio.pause();playing=false}
-    updateUI();syncPlaying(playing)
-  }catch(e){console.error('togglePlay',e)}
-}
-
-function nextTrack(){try{doNext()}catch(e){err('nextTrack:'+e.message)}}
-function prevTrack(){try{doPrev()}catch(e){err('prevTrack:'+e.message)}}
-
-function playFromList(i){
-  if(!results[i])return;
-  queue=[];qIdx=0;
-  currentIdx=i;
-  playTrack(results[i])
+    doUpdateUI();syncPlaying(playing)
+  }catch(e){err('togglePlay: '+e.message)}
 }
 
 function doNext(){
-  if(queue.length>1){qIdx=(qIdx+1)%queue.length;playTrack(queue[qIdx])}
-  else if(results.length>1){
-    if(currentIdx>=0&&currentIdx<results.length-1)currentIdx++;
-    else currentIdx=0;
-    playTrack(results[currentIdx])
-  }else toast('Queue empty')
+  try{
+    if(queue.length>1){qIdx=(qIdx+1)%queue.length;playTrack(queue[qIdx]);return}
+    if(results.length>1){
+      if(currentIdx>=0&&currentIdx<results.length-1)currentIdx++;
+      else currentIdx=0;
+      playTrack(results[currentIdx]);return;
+    }
+    toast('Queue empty')
+  }catch(e){err('doNext: '+e.message)}
 }
 
 function doPrev(){
-  if(queue.length>1){qIdx=(qIdx-1+queue.length)%queue.length;playTrack(queue[qIdx])}
-  else if(results.length>1){
-    if(currentIdx>0)currentIdx--;
-    else currentIdx=results.length-1;
-    playTrack(results[currentIdx])
-  }else toast('Queue empty')
+  try{
+    if(queue.length>1){qIdx=(qIdx-1+queue.length)%queue.length;playTrack(queue[qIdx]);return}
+    if(results.length>1){
+      if(currentIdx>0)currentIdx--;
+      else currentIdx=results.length-1;
+      playTrack(results[currentIdx]);return;
+    }
+    toast('Queue empty')
+  }catch(e){err('doPrev: '+e.message)}
 }
 
-function sk(){nextTrack()}
-function prv(){prevTrack()}
+function playFromList(i){
+  try{
+    if(!results[i])return;
+    queue=[];qIdx=0;
+    currentIdx=i;
+    playTrack(results[i])
+  }catch(e){err('playFromList: '+e.message)}
+}
 
 function syncPlaying(p){
   try{if(window.MediaBridge&&window.MediaBridge.setPlaying)window.MediaBridge.setPlaying(p)}catch(e){}
@@ -306,31 +332,92 @@ function onNativeAudioStart(){
   try{if(audio)audio.pause()}catch(e){}
 }
 
+function mediaOnPlay(){try{if(nativePlaying){syncPlaying(true);return}doTogglePlay()}catch(e){}}
+function mediaOnPause(){try{if(nativePlaying){syncPlaying(false);return}doTogglePlay()}catch(e){}}
+function mediaOnNext(){doNext()}
+function mediaOnPrev(){doPrev()}
+function sk(){doNext()}
+function prv(){doPrev()}
+
 // ===== SWIPE =====
-function swipeStart(e){
-  if(e.target.closest('button')){swiping=false;return}
-  swiping=true;
-  swipeX=e.touches[0].screenX;
-}
-function swipeEnd(e){
-  try{
-    if(!swiping||!swipeX)return;
-    var dx=e.changedTouches[0].screenX-swipeX;
-    swiping=false;swipeX=0;
-    if(Math.abs(dx)<60)return;
-    if(dx>0)prevTrack();else nextTrack();
-  }catch(e){}
-}
+(function(){
+  var p=$('player');
+  var sx=0,sy=0,sw=0;
+  function ts(e){
+    try{
+      if(e.target.closest('button')||!p||p.style.display==='none'){sx=0;return}
+      var t=e.touches[0];
+      sx=t.screenX;sy=t.screenY;sw=true;
+    }catch(e){}
+  }
+  function te(e){
+    try{
+      if(!sw||!sx)return;
+      var t=e.changedTouches[0];
+      var dx=t.screenX-sx,dy=t.screenY-sy;
+      sx=0;sw=false;
+      if(Math.abs(dy)>Math.abs(dx)||Math.abs(dx)<50)return;
+      if(dx>0)doPrev();else doNext();
+    }catch(e){}
+  }
+  if(p){p.addEventListener('touchstart',ts,{passive:true});p.addEventListener('touchend',te,{passive:true})}
+})();
 
 // ===== MEDIA SESSION =====
-function updateMediaSession(track){
+function doUpdateMediaSession(track){
   try{
     navigator.mediaSession.metadata=new MediaMetadata({title:track.title||'MoodFlow',artist:track.artist||''});
     navigator.mediaSession.playbackState='playing';
-    navigator.mediaSession.setActionHandler('play',function(){if(nativePlaying){syncPlaying(true);return}togglePlay()});
-    navigator.mediaSession.setActionHandler('pause',function(){if(nativePlaying){syncPlaying(false);return}togglePlay()});
-    navigator.mediaSession.setActionHandler('nexttrack',function(){nextTrack()});
-    navigator.mediaSession.setActionHandler('previoustrack',function(){prevTrack()});
+    navigator.mediaSession.setActionHandler('play',function(){mediaOnPlay()});
+    navigator.mediaSession.setActionHandler('pause',function(){mediaOnPause()});
+    navigator.mediaSession.setActionHandler('nexttrack',function(){mediaOnNext()});
+    navigator.mediaSession.setActionHandler('previoustrack',function(){mediaOnPrev()});
+  }catch(e){}
+}
+
+// ===== VOICE SEARCH =====
+function toggleMic(){
+  try{
+    if(recogActive){stopMic();return}
+    var SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SpeechRecognition){toast('Voice search not supported on this device');return}
+    recog=new SpeechRecognition();
+    recog.lang='hi-IN';
+    recog.continuous=false;
+    recog.interimResults=false;
+    recog.maxAlternatives=1;
+    recog.onresult=function(e){
+      var text=e.results[0][0].transcript;
+      stopMic();
+      $('si').value=text;
+      if(text.trim())search(text.trim());
+    };
+    recog.onerror=function(e){
+      stopMic();
+      if(e.error==='no-speech')toast('No speech detected. Try again.');
+      else if(e.error==='not-allowed')toast('Microphone permission denied. Please allow mic access.');
+      else if(e.error==='network')toast('Network error during voice recognition.');
+      else toast('Voice error: '+e.error);
+    };
+    recog.onend=function(){
+      recogActive=false;
+      var btn=$('micBtn');
+      if(btn)btn.classList.remove('active');
+    };
+    recog.start();
+    recogActive=true;
+    var btn=$('micBtn');
+    if(btn)btn.classList.add('active');
+    toast('Listening... Speak now');
+  }catch(e){toast('Voice search failed: '+e.message)}
+}
+
+function stopMic(){
+  try{
+    recogActive=false;
+    if(recog){recog.abort();recog=null}
+    var btn=$('micBtn');
+    if(btn)btn.classList.remove('active');
   }catch(e){}
 }
 
@@ -343,62 +430,72 @@ $('sb').onclick=function(){
   search(q);
 };
 $('si').onkeydown=function(e){if(e.key==='Enter')$('sb').click()};
+$('si').oninput=function(){stopMic()};
 
 var chips=document.querySelectorAll('.chip');
 for(var i=0;i<chips.length;i++){
-  chips[i].onclick=function(){
-    var c=document.querySelectorAll('.chip');
-    for(var j=0;j<c.length;j++)c[j].classList.remove('on');
-    this.classList.add('on');
-    search(this.dataset.q);
-  };
+  (function(c){
+    c.onclick=function(){
+      var all=document.querySelectorAll('.chip');
+      for(var j=0;j<all.length;j++)all[j].classList.remove('on');
+      c.classList.add('on');
+      search(c.dataset.q);
+    };
+  })(chips[i]);
 }
 
 // ===== INIT =====
-$('splash').classList.add('hide');
-setTimeout(function(){search('bollywood hits trending')},500);
+setTimeout(function(){search('bollywood hits trending')},600);
 
 // ===== UPDATE =====
 function checkRelease(){
-  if(updateChecked||updateAttempts>=10)return;
-  updateAttempts++;
-  if(window.MediaBridge&&window.MediaBridge.checkLatestRelease){
-    window.MediaBridge.checkLatestRelease();
-  }else{
-    setTimeout(checkRelease,1500);
-  }
+  try{
+    if(updateChecked)return;
+    if(window.MediaBridge&&window.MediaBridge.checkLatestRelease){
+      window.MediaBridge.checkLatestRelease();
+    }else{
+      setTimeout(checkRelease,2000);
+    }
+  }catch(e){}
 }
 function onUpdateCheck(tag,apkUrl){
-  if(updateChecked)return;
-  var cv='0.0.0';
-  try{if(window.MediaBridge&&window.MediaBridge.getVersionName)cv=window.MediaBridge.getVersionName()}catch(e){}
-  if(cv==='0.0.0')return;
-  tag=(tag||'').replace(/^v/i,'');
-  var at=tag.split('.'),bt=cv.split('.');
-  for(var i=0;i<Math.max(at.length,bt.length);i++){
-    var na=parseInt(at[i])||0,nb=parseInt(bt[i])||0;
-    if(na>nb){
-      updateChecked=true;
-      updateInfo={tag:tag,apkUrl:apkUrl};
-      $('ut').textContent='Version '+tag+' is now available. Please update to continue.';
-      $('updateScreen').classList.add('show');
-      return;
+  try{
+    if(updateChecked)return;
+    var cv='0.0.0';
+    try{if(window.MediaBridge&&window.MediaBridge.getVersionName)cv=window.MediaBridge.getVersionName()}catch(e){}
+    if(cv==='0.0.0')return;
+    tag=(tag||'').replace(/^v/i,'');
+    var at=tag.split('.'),bt=cv.split('.');
+    for(var i=0;i<Math.max(at.length,bt.length);i++){
+      var na=parseInt(at[i])||0,nb=parseInt(bt[i])||0;
+      if(na>nb){
+        updateChecked=true;
+        updateInfo={tag:tag,apkUrl:apkUrl};
+        $('ut').textContent='A new version is available.';
+        var btn=$('updateBtn');
+        if(btn){btn.disabled=false;btn.textContent='Update'}
+        var us=$('updateScreen');
+        if(us)us.classList.add('show');
+        return;
+      }
+      if(na<nb)return;
     }
-    if(na<nb)return;
-  }
+  }catch(e){}
 }
 function doUpdate(){
-  if(!updateInfo||!updateInfo.apkUrl)return;
-  if(window.MediaBridge&&window.MediaBridge.downloadApk){
-    window.MediaBridge.downloadApk(updateInfo.apkUrl);
-    $('updateBtn').textContent='Downloading...';
-    $('updateBtn').disabled=true;
-  }
+  try{
+    if(!updateInfo||!updateInfo.apkUrl){toast('Update info missing');return}
+    if(window.MediaBridge&&window.MediaBridge.downloadApk){
+      window.MediaBridge.downloadApk(updateInfo.apkUrl);
+      var btn=$('updateBtn');
+      if(btn){btn.textContent='Downloading...';btn.disabled=true}
+    }
+  }catch(e){}
 }
-setTimeout(checkRelease,5000);
-setTimeout(checkRelease,12000);
+setTimeout(checkRelease,3000);
+setTimeout(checkRelease,8000);
 
-console.log('MoodFlow ready v1.9.2');
+}());
 </script>
 </body>
 </html>
