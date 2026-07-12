@@ -60,8 +60,22 @@ public class MediaPlaybackService extends Service {
         createChannel();
         setupAudioManager();
         setupMediaSession();
-        try { startForeground(NOTIF_ID, buildNotif()); } catch (Exception ignored) {}
+        ensureForeground();
         acquireWakeLock();
+    }
+
+    private void ensureForeground() {
+        try {
+            startForeground(NOTIF_ID, buildNotif());
+        } catch (Exception e) {
+            // Retry after a short delay (permission might be granted soon)
+            mainHandler.postDelayed(() -> {
+                try { startForeground(NOTIF_ID, buildNotif()); } catch (Exception ignored) {}
+            }, 2000);
+            mainHandler.postDelayed(() -> {
+                try { startForeground(NOTIF_ID, buildNotif()); } catch (Exception ignored) {}
+            }, 5000);
+        }
     }
 
     private void acquireWakeLock() {
@@ -70,7 +84,7 @@ public class MediaPlaybackService extends Service {
                 PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
                 wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MoodFlow:audio");
             }
-            if (!wakeLock.isHeld()) wakeLock.acquire();
+            if (!wakeLock.isHeld()) wakeLock.acquire(10*60*1000L /*10 min timeout to prevent battery drain*/);
         } catch (Exception ignored) {}
     }
 
@@ -374,6 +388,22 @@ public class MediaPlaybackService extends Service {
                 }
             } catch (Exception ignored) {}
         }).start();
+    }
+
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        super.onTaskRemoved(rootIntent);
+        // Keep service alive even if app is swiped from recents
+        try {
+            Intent restartIntent = new Intent(this, MediaPlaybackService.class);
+            restartIntent.setAction(ACTION_START);
+            if (lastVideoId != null) restartIntent.putExtra("videoId", lastVideoId);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(restartIntent);
+            } else {
+                startService(restartIntent);
+            }
+        } catch (Exception ignored) {}
     }
 
     @Override
