@@ -100,9 +100,10 @@ header h1{font-size:1.2rem;flex:1;background:linear-gradient(135deg,#e94560,#ff6
 
 <script>
 // ===== UTILS =====
-var currentTrack=null,playing=false,audio=null,results=[],queue=[],qIdx=0;
+var currentTrack=null,currentIdx=-1,playing=false,audio=null,results=[],queue=[],qIdx=0;
 var nativePlaying=false,updateChecked=false,updateAttempts=0,updateInfo=null;
 var swiping=false,swipeX=0;
+var loadingTrack=false;
 function $(i){return document.getElementById(i)}
 function toast(m){var e=$('toast');if(!e)return;e.textContent=m;e.classList.remove('hide');clearTimeout(e._h);e._h=setTimeout(function(){e.classList.add('hide')},3000)}
 function err(m){toast(m);$('st').textContent=m}
@@ -228,61 +229,69 @@ function playTrack(track){
 }
 
 function updateUI(){
-  var btn=$('pp');
-  if(btn)btn.innerHTML=playing?'⏸':'►';
-  var st=$('st');
-  if(st&&currentTrack&&playing)st.textContent='Playing: '+currentTrack.title;
+  try{
+    var btn=$('pp');
+    if(btn)btn.innerHTML=playing?'⏸':'►';
+    if(currentTrack&&playing){
+      var st=$('st');
+      if(st)st.textContent='Playing: '+currentTrack.title;
+    }
+  }catch(e){}
 }
 
 function togglePlay(){
-  if(!currentTrack)return;
-  if(nativePlaying){
-    try{
-      if(window.MediaBridge&&window.MediaBridge.stopNativePlayback){
-        window.MediaBridge.stopNativePlayback();
-        playing=false;nativePlaying=false;
-        updateUI();syncPlaying(false);
-        return;
-      }
-    }catch(e){}
-    nativePlaying=false;
-    try{if(audio){if(audio.paused){audio.play();playing=true}else{audio.pause();playing=false}}}catch(e){}
-    syncPlaying(playing);updateUI();return
-  }
-  if(window.MediaBridge&&window.MediaBridge.setPlaying){
-    playing=!playing;
-    window.MediaBridge.setPlaying(playing);
-    updateUI();return
-  }
-  if(!audio){err('No player');return}
-  if(audio.paused){audio.play();playing=true}else{audio.pause();playing=false}
-  updateUI();syncPlaying(playing)
+  try{
+    if(!currentTrack){toast('No track loaded');return}
+    if(nativePlaying){
+      try{
+        if(window.MediaBridge&&window.MediaBridge.stopNativePlayback){
+          window.MediaBridge.stopNativePlayback();
+          playing=false;nativePlaying=false;
+          updateUI();syncPlaying(false);
+          return
+        }
+      }catch(e){}
+      nativePlaying=false;
+      if(audio){if(audio.paused){audio.play();playing=true}else{audio.pause();playing=false}}
+      syncPlaying(playing);updateUI();return
+    }
+    if(window.MediaBridge&&window.MediaBridge.setPlaying){
+      playing=!playing;
+      window.MediaBridge.setPlaying(playing);
+      updateUI();return
+    }
+    if(!audio){toast('Audio not ready');return}
+    if(audio.paused){audio.play();playing=true}else{audio.pause();playing=false}
+    updateUI();syncPlaying(playing)
+  }catch(e){console.error('togglePlay',e)}
 }
 
-function nextTrack(){
-  if(queue.length>1){qIdx=(qIdx+1)%queue.length;playTrack(queue[qIdx])}
-  else if(results.length>1){
-    var idx=-1;
-    for(var i=0;i<results.length;i++){if(results[i].id===currentTrack.id){idx=i;break}}
-    if(idx>=0&&idx<results.length-1)playTrack(results[idx+1]);
-    else playTrack(results[0]);
-  }else err('No more songs')
-}
-
-function prevTrack(){
-  if(queue.length>1){qIdx=(qIdx-1+queue.length)%queue.length;playTrack(queue[qIdx])}
-  else if(results.length>1){
-    var idx=-1;
-    for(var i=0;i<results.length;i++){if(results[i].id===currentTrack.id){idx=i;break}}
-    if(idx>0)playTrack(results[idx-1]);
-    else playTrack(results[results.length-1]);
-  }else err('No more songs')
-}
+function nextTrack(){try{doNext()}catch(e){err('nextTrack:'+e.message)}}
+function prevTrack(){try{doPrev()}catch(e){err('prevTrack:'+e.message)}}
 
 function playFromList(i){
   if(!results[i])return;
   queue=[];qIdx=0;
+  currentIdx=i;
   playTrack(results[i])
+}
+
+function doNext(){
+  if(queue.length>1){qIdx=(qIdx+1)%queue.length;playTrack(queue[qIdx])}
+  else if(results.length>1){
+    if(currentIdx>=0&&currentIdx<results.length-1)currentIdx++;
+    else currentIdx=0;
+    playTrack(results[currentIdx])
+  }else toast('Queue empty')
+}
+
+function doPrev(){
+  if(queue.length>1){qIdx=(qIdx-1+queue.length)%queue.length;playTrack(queue[qIdx])}
+  else if(results.length>1){
+    if(currentIdx>0)currentIdx--;
+    else currentIdx=results.length-1;
+    playTrack(results[currentIdx])
+  }else toast('Queue empty')
 }
 
 function sk(){nextTrack()}
@@ -304,11 +313,13 @@ function swipeStart(e){
   swipeX=e.touches[0].screenX;
 }
 function swipeEnd(e){
-  if(!swiping||!swipeX)return;
-  var dx=e.changedTouches[0].screenX-swipeX;
-  swiping=false;swipeX=0;
-  if(Math.abs(dx)<60)return;
-  if(dx>0)prevTrack();else nextTrack();
+  try{
+    if(!swiping||!swipeX)return;
+    var dx=e.changedTouches[0].screenX-swipeX;
+    swiping=false;swipeX=0;
+    if(Math.abs(dx)<60)return;
+    if(dx>0)prevTrack();else nextTrack();
+  }catch(e){}
 }
 
 // ===== MEDIA SESSION =====
@@ -387,7 +398,7 @@ function doUpdate(){
 setTimeout(checkRelease,5000);
 setTimeout(checkRelease,12000);
 
-console.log('MoodFlow ready v1.9.1');
+console.log('MoodFlow ready v1.9.2');
 </script>
 </body>
 </html>
