@@ -1,1 +1,1 @@
-{"version":"1.8.5","apkUrl":"https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.8.5/MoodFlow-v1.8.5.apk","notes":"FIX: Native MediaPlayer for notification/lock screen buttons. Plugins load before super.onCreate. Raw URL auto-update."}
+{"version":"1.8.6","apkUrl":"https://github.com/namanmali808-cpu/moodflow-player/releases/download/v1.8.6/MoodFlow-v1.8.6.apk","notes":"RESTORED: Full old UI with auth, premium, subscriptions, mood/language selection, queue, favorites, mic. Native MediaPlayer fixes. Raw URL auto-update."}
