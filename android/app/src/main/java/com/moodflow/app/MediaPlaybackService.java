@@ -45,6 +45,7 @@ public class MediaPlaybackService extends Service {
     private PowerManager.WakeLock wakeLock;
     private AudioManager audioManager;
     private AudioFocusRequest audioFocusRequest;
+    private final Object focusLock = new Object();
     private String currentTitle = "MoodFlow";
     private String currentArtist = "";
     private boolean isPlaying = false;
@@ -52,7 +53,6 @@ public class MediaPlaybackService extends Service {
     private MediaPlayer mediaPlayer;
     private String lastVideoId;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private boolean foregroundAttempted = false;
 
     @Override
     public void onCreate() {
@@ -60,23 +60,13 @@ public class MediaPlaybackService extends Service {
         createChannel();
         setupAudioManager();
         setupMediaSession();
-        acquireWakeLock();
     }
 
     private void ensureForeground() {
-        if (foregroundAttempted) return;
-        foregroundAttempted = true;
         try {
             startForeground(NOTIF_ID, buildNotif());
         } catch (Exception e) {
-            Log.w("MoodFlow", "startForeground failed: " + e.getMessage());
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    Intent intent = new Intent(this, MainActivity.class);
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    startActivity(intent);
-                }
-            } catch (Exception ignored) {}
+            Log.w("MoodFlow", "startForeground: " + e.getMessage());
         }
     }
 
@@ -86,7 +76,7 @@ public class MediaPlaybackService extends Service {
                 PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
                 wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MoodFlow:audio");
             }
-            if (!wakeLock.isHeld()) wakeLock.acquire(30*60*1000L);
+            if (!wakeLock.isHeld()) wakeLock.acquire();
         } catch (Exception ignored) {}
     }
 
@@ -99,7 +89,7 @@ public class MediaPlaybackService extends Service {
     private void createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel ch = new NotificationChannel(CHANNEL_ID, "MoodFlow",
-                    NotificationManager.IMPORTANCE_LOW);
+                    NotificationManager.IMPORTANCE_DEFAULT);
             ch.setShowBadge(false);
             ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
             getSystemService(NotificationManager.class).createNotificationChannel(ch);
@@ -109,11 +99,32 @@ public class MediaPlaybackService extends Service {
     private void setupAudioManager() {
         audioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            AudioManager.OnAudioFocusChangeListener afListener = focusChange -> {
+                switch (focusChange) {
+                    case AudioManager.AUDIOFOCUS_LOSS:
+                        mainHandler.post(() -> pausePlayback());
+                        break;
+                    case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
+                        mainHandler.post(() -> pausePlayback());
+                        break;
+                    case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
+                        if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+                            try { mediaPlayer.setVolume(0.3f, 0.3f); } catch (Exception ignored) {}
+                        }
+                        break;
+                    case AudioManager.AUDIOFOCUS_GAIN:
+                        if (mediaPlayer != null && !mediaPlayer.isPlaying()) {
+                            try { mediaPlayer.setVolume(1.0f, 1.0f); } catch (Exception ignored) {}
+                        }
+                        break;
+                }
+            };
             audioFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
                 .setAudioAttributes(new AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_MEDIA)
                     .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                     .build())
+                .setOnAudioFocusChangeListener(afListener)
                 .build();
         }
     }
@@ -214,6 +225,7 @@ public class MediaPlaybackService extends Service {
             }
         } catch (Exception ignored) {}
         releaseWakeLock();
+        abandonAudioFocus();
     }
 
     private void requestAudioFocus() {
@@ -222,6 +234,16 @@ public class MediaPlaybackService extends Service {
                 audioManager.requestAudioFocus(audioFocusRequest);
             } else {
                 audioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void abandonAudioFocus() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (audioFocusRequest != null) audioManager.abandonAudioFocusRequest(audioFocusRequest);
+            } else {
+                audioManager.abandonAudioFocus(null);
             }
         } catch (Exception ignored) {}
     }
@@ -266,9 +288,6 @@ public class MediaPlaybackService extends Service {
             case ACTION_START: {
                 String vid = intent.getStringExtra("videoId");
                 if (vid != null && !vid.isEmpty()) lastVideoId = vid;
-                if (mediaPlayer == null && lastVideoId != null) {
-                    fetchStreamForCurrentVideo();
-                }
                 break;
             }
             case ACTION_PLAY:
@@ -390,13 +409,8 @@ public class MediaPlaybackService extends Service {
     public void onTaskRemoved(Intent rootIntent) {
         super.onTaskRemoved(rootIntent);
         try {
-            Intent restartIntent = new Intent(this, MediaPlaybackService.class);
-            restartIntent.setAction(ACTION_START);
-            if (lastVideoId != null) restartIntent.putExtra("videoId", lastVideoId);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(restartIntent);
-            } else {
-                startService(restartIntent);
+            if (mediaPlayer != null && isPlaying) {
+                acquireWakeLock();
             }
         } catch (Exception ignored) {}
     }
@@ -406,8 +420,7 @@ public class MediaPlaybackService extends Service {
 
     @Override
     public void onDestroy() {
-        stopPlayback();
-        releaseWakeLock();
+        try { stopForeground(true); } catch (Exception ignored) {}
         try {
             if (mediaSession != null) {
                 mediaSession.setActive(false);
@@ -415,7 +428,8 @@ public class MediaPlaybackService extends Service {
                 mediaSession = null;
             }
         } catch (Exception ignored) {}
-        try { stopForeground(true); } catch (Exception ignored) {}
+        stopPlayback();
+        releaseWakeLock();
         super.onDestroy();
     }
 }

@@ -70,15 +70,25 @@ public class MediaBridge {
 
     @JavascriptInterface
     public void startVoiceRecognitionWithLang(String lang) {
-        if (speechRecognitionActive) return;
+        if (speechRecognitionActive) {
+            Log.w(TAG, "Voice: already active, ignoring");
+            return;
+        }
         if (lang == null || lang.isEmpty()) lang = "en-US";
+        // Permission check
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (ctx.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
                 if (ctx instanceof MainActivity) {
-                    ((MainActivity) ctx).requestRecordAudioPermission();
+                    MainActivity ma = (MainActivity) ctx;
+                    if (ma.isRecordAudioPermanentlyDenied()) {
+                        // Permanently denied - guide user to settings
+                        webView.post(() -> webView.evaluateJavascript(
+                            "onVoicePermissionGuide()", null));
+                    } else {
+                        // First denial - request permission (don't show error yet)
+                        ma.requestRecordAudioPermission();
+                    }
                 }
-                webView.post(() -> webView.evaluateJavascript(
-                    "onVoiceError('Microphone permission required.')", null));
                 return;
             }
         }
@@ -93,6 +103,11 @@ public class MediaBridge {
                 speechRecognizer = null;
             }
             speechRecognizer = SpeechRecognizer.createSpeechRecognizer(ctx);
+            if (speechRecognizer == null) {
+                webView.post(() -> webView.evaluateJavascript(
+                    "onVoiceError('Speech recognition service unavailable')", null));
+                return;
+            }
             speechRecognizer.setRecognitionListener(new RecognitionListener() {
                 @Override public void onReadyForSpeech(Bundle params) {
                     Log.i(TAG, "Voice: ready");

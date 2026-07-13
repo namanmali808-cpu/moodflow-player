@@ -9,6 +9,7 @@ import android.webkit.WebSettings;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.BridgeActivity;
@@ -18,6 +19,7 @@ public class MainActivity extends BridgeActivity {
     private ActivityResultLauncher<String> notifPermissionLauncher;
     private ActivityResultLauncher<String> audioPermissionLauncher;
     private int bridgeInjectAttempts = 0;
+    private boolean audioPermissionEverRequested = false;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -110,8 +112,22 @@ public class MainActivity extends BridgeActivity {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
                 == PackageManager.PERMISSION_GRANTED) return;
+        audioPermissionEverRequested = true;
         try {
             audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO);
         } catch (Exception ignored) {}
+    }
+
+    public boolean isRecordAudioPermanentlyDenied() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false;
+        if (!audioPermissionEverRequested) return false;
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                == PackageManager.PERMISSION_GRANTED) return false;
+        return !ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.RECORD_AUDIO);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 }

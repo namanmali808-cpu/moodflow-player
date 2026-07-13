@@ -354,26 +354,31 @@ function prv(){try{doPrev()}catch(e){}}
 // ===== SWIPE =====
 (function(){
   var p=$('player');
-  var sx=0,sy=0,sw=false;
+  if(!p)return;
+  var startX=-1,startY=-1,swiping=false;
   function ts(e){
     try{
-      if(e.target.closest('button')||!p||p.style.display==='none'){sx=0;sw=false;return}
-      sx=e.touches[0].screenX;
-      sy=e.touches[0].screenY;
-      sw=true;
-    }catch(e){}
+      if(e.target.closest('button')||p.style.display==='none'){startX=-1;swiping=false;return}
+      var t=e.touches[0];
+      startX=t.screenX;startY=t.screenY;
+      swiping=true;
+    }catch(e){startX=-1;swiping=false}
   }
   function te(e){
     try{
-      if(!sw||!sx)return;
-      var dx=e.changedTouches[0].screenX-sx;
-      var dy=e.changedTouches[0].screenY-sy;
-      sx=0;sw=false;
+      if(!swiping||startX<0)return;
+      var t=e.changedTouches[0];
+      var dx=t.screenX-startX;
+      var dy=t.screenY-startY;
+      startX=-1;swiping=false;
       if(Math.abs(dy)>Math.abs(dx)||Math.abs(dx)<50)return;
       if(dx>0)doPrev();else doNext();
-    }catch(e){}
+    }catch(e){startX=-1;swiping=false}
   }
-  if(p){p.addEventListener('touchstart',ts,{passive:true});p.addEventListener('touchend',te,{passive:true})}
+  function tc(e){startX=-1;swiping=false}
+  p.addEventListener('touchstart',ts,{passive:true});
+  p.addEventListener('touchend',te,{passive:true});
+  p.addEventListener('touchcancel',tc,{passive:true});
 })();
 
 // ===== MEDIA SESSION =====
@@ -438,6 +443,11 @@ function onVoiceReady(){
 
 function onVoicePermissionGranted(){
   onMicClick();
+}
+
+function onVoicePermissionGuide(){
+  stopMic();
+  toast('Microphone permission is permanently denied. Go to App Settings > Permissions > Microphone to enable.');
 }
 
 // Called by native when app resumes
