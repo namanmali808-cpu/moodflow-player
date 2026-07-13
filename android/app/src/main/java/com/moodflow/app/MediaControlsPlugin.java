@@ -103,7 +103,6 @@ public class MediaControlsPlugin extends Plugin {
             else if (AUDIO_STARTED.equals(a)) js = "if(window.onNativeAudioStart)onNativeAudioStart();";
             else return;
             try { wv.post(() -> { try { wv.evaluateJavascript(js, null); } catch (Exception ignored) {} }); } catch (Exception ignored) {}
-            try { wv.loadUrl("javascript:" + js); } catch (Exception ignored) {}
         }
     };
 

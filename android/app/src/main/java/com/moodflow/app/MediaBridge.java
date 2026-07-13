@@ -67,14 +67,20 @@ public class MediaBridge {
 
     @JavascriptInterface
     public void startVoiceRecognition() {
+        startVoiceRecognitionWithLang("hi-IN");
+    }
+
+    @JavascriptInterface
+    public void startVoiceRecognitionWithLang(String lang) {
         if (speechRecognitionActive) return;
+        if (lang == null || lang.isEmpty()) lang = "en-US";
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (ctx.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
                 if (ctx instanceof MainActivity) {
                     ((MainActivity) ctx).requestRecordAudioPermission();
                 }
                 webView.post(() -> webView.evaluateJavascript(
-                    "onVoiceError('Microphone permission required. Tap mic again after granting.')", null));
+                    "onVoiceError('Microphone permission required.')", null));
                 return;
             }
         }
@@ -139,12 +145,12 @@ public class MediaBridge {
             });
             Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN");
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang);
             intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
             intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false);
             speechRecognitionActive = true;
             speechRecognizer.startListening(intent);
-            Log.i(TAG, "Voice: started listening");
+            Log.i(TAG, "Voice: started listening lang=" + lang);
         } catch (Exception e) {
             speechRecognitionActive = false;
             Log.e(TAG, "Voice start failed", e);

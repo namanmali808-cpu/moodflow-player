@@ -18,6 +18,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.util.Log;
 import android.webkit.WebView;
 
 import androidx.core.app.NotificationCompat;
@@ -51,6 +52,7 @@ public class MediaPlaybackService extends Service {
     private MediaPlayer mediaPlayer;
     private String lastVideoId;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private boolean foregroundAttempted = false;
 
     @Override
     public void onCreate() {
@@ -58,8 +60,24 @@ public class MediaPlaybackService extends Service {
         createChannel();
         setupAudioManager();
         setupMediaSession();
-        try { startForeground(NOTIF_ID, buildNotif()); } catch (Exception ignored) {}
         acquireWakeLock();
+    }
+
+    private void ensureForeground() {
+        if (foregroundAttempted) return;
+        foregroundAttempted = true;
+        try {
+            startForeground(NOTIF_ID, buildNotif());
+        } catch (Exception e) {
+            Log.w("MoodFlow", "startForeground failed: " + e.getMessage());
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    Intent intent = new Intent(this, MainActivity.class);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(intent);
+                }
+            } catch (Exception ignored) {}
+        }
     }
 
     private void acquireWakeLock() {
@@ -223,6 +241,8 @@ public class MediaPlaybackService extends Service {
         if (intent == null) return START_STICKY;
         String action = intent.getAction();
         if (action == null) return START_STICKY;
+
+        ensureForeground();
 
         switch (action) {
             case ACTION_STOP:

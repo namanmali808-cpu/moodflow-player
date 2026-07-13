@@ -37,8 +37,8 @@ public class MainActivity extends BridgeActivity {
                     try {
                         WebView wv = getBridge().getWebView();
                         if (wv != null) {
-                            wv.post(() -> wv.evaluateJavascript(
-                                "if(window.onVoiceReady)onVoiceReady();", null));
+                        wv.post(() -> wv.evaluateJavascript(
+                            "if(window.onVoicePermissionGranted)onVoicePermissionGranted();", null));
                         }
                     } catch (Exception ignored) {}
                 }
