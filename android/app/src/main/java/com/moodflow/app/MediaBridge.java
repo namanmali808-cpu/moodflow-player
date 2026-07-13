@@ -1,12 +1,13 @@
 package com.moodflow.app;
 
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
 import android.Manifest;
+import android.app.DownloadManager;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -22,13 +23,10 @@ import android.webkit.WebView;
 import android.widget.Toast;
 
 import androidx.core.content.FileProvider;
-import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -421,85 +419,93 @@ public class MediaBridge {
     @JavascriptInterface
     public void downloadApk(final String url) {
         if (url == null || url.isEmpty()) return;
-        // Request notification permission on main thread
+        // Request notification permission on Android 13+ so DownloadManager notification shows
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             new Handler(ctx.getMainLooper()).post(() -> {
                 if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS)
                         != PackageManager.PERMISSION_GRANTED) {
-                    Toast.makeText(ctx, "Downloading update...", Toast.LENGTH_SHORT).show();
-                    try {
-                        ((MainActivity) ctx).requestNotifPermission();
-                    } catch (Exception ignored) {}
+                    try { ((MainActivity) ctx).requestNotifPermission(); } catch (Exception ignored) {}
                 }
             });
         }
-        new Thread(() -> {
-            try {
-                HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
-                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36");
-                conn.setInstanceFollowRedirects(true);
-                conn.setConnectTimeout(15000);
-                conn.setReadTimeout(30000);
-                conn.connect();
-                int len = conn.getContentLength();
-                String fileName = "MoodFlow-" + System.currentTimeMillis() + ".apk";
-                File dir;
-                if (Build.VERSION.SDK_INT >= 29) {
-                    dir = ctx.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
-                } else {
-                    dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-                }
-                if (dir != null && !dir.exists()) dir.mkdirs();
-                File apkFile = new File(dir, fileName);
-                InputStream in = conn.getInputStream();
-                FileOutputStream out = new FileOutputStream(apkFile);
-                byte[] buf = new byte[8192];
-                int read, total = 0;
-                int lastPct = -1;
-                while ((read = in.read(buf)) != -1) {
-                    out.write(buf, 0, read);
-                    total += read;
-                    if (len > 0) {
-                        int pct = total * 100 / len;
-                        if (pct != lastPct) { lastPct = pct; showDownloadNotification(pct); }
-                    }
-                }
-                in.close(); out.close(); conn.disconnect();
-                dismissDownloadNotification();
-                installApk(apkFile);
-            } catch (Exception e) { Log.e(TAG, "downloadApk failed", e); }
-        }).start();
-    }
-
-    private void showDownloadNotification(int pct) {
-        NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            nm.createNotificationChannel(new NotificationChannel("download", "Downloads", NotificationManager.IMPORTANCE_DEFAULT));
+        Toast.makeText(ctx, "Download started", Toast.LENGTH_SHORT).show();
+        // Use Android DownloadManager for reliable download handling
+        DownloadManager dm = (DownloadManager) ctx.getSystemService(Context.DOWNLOAD_SERVICE);
+        if (dm == null) return;
+        String fileName = "MoodFlow-update.apk";
+        DownloadManager.Request req = new DownloadManager.Request(Uri.parse(url));
+        req.setTitle("MoodFlow Update");
+        req.setDescription("Downloading...");
+        req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+        req.setMimeType("application/vnd.android.package-archive");
+        req.setRequiresCharging(false);
+        req.setAllowedOverMetered(true);
+        req.setAllowedOverRoaming(true);
+        if (Build.VERSION.SDK_INT >= 29) {
+            req.setDestinationInExternalFilesDir(ctx, Environment.DIRECTORY_DOWNLOADS, fileName);
+        } else {
+            req.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
         }
-        Notification notif = new NotificationCompat.Builder(ctx, "download")
-            .setSmallIcon(android.R.drawable.stat_sys_download)
-            .setContentTitle("MoodFlow Update").setContentText("Downloading... " + pct + "%")
-            .setProgress(100, pct, false).setOngoing(true).build();
-        nm.notify(1001, notif);
-    }
-
-    private void dismissDownloadNotification() {
-        NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
-        nm.cancel(1001);
-        Notification notif = new NotificationCompat.Builder(ctx, "download")
-            .setSmallIcon(android.R.drawable.stat_sys_download_done)
-            .setContentTitle("MoodFlow Update").setContentText("Download complete")
-            .setAutoCancel(true).setProgress(0, 0, false).build();
-        nm.notify(1001, notif);
+        final long downloadId = dm.enqueue(req);
+        // Save the expected file path for reliable install after download
+        final File apkFile;
+        if (Build.VERSION.SDK_INT >= 29) {
+            apkFile = new File(ctx.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), fileName);
+        } else {
+            apkFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), fileName);
+        }
+        // Register receiver for completion
+        BroadcastReceiver onComplete = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
+                if (id != downloadId) return;
+                try {
+                    DownloadManager.Query q = new DownloadManager.Query();
+                    q.setFilterById(downloadId);
+                    Cursor c = dm.query(q);
+                    if (c != null && c.moveToFirst()) {
+                        int status = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
+                        if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                            c.close();
+                            installApk(apkFile);
+                            return;
+                        }
+                        if (c != null) c.close();
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Download complete handler error", e);
+                }
+                // Failure - reset button and show error
+                webView.post(() -> {
+                    try {
+                        webView.evaluateJavascript(
+                            "try{var b=document.getElementById('updateBtn');if(b){b.textContent='Update';b.disabled=false}toast('Download failed')}catch(e){}", null);
+                    } catch (Exception ignored) {}
+                });
+                try { context.unregisterReceiver(this); } catch (Exception ignored) {}
+            }
+        };
+        ctx.registerReceiver(onComplete, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
     }
 
     private void installApk(File apkFile) {
-        Intent install = new Intent(Intent.ACTION_VIEW);
-        Uri uri = FileProvider.getUriForFile(ctx, "com.moodflow.app.fileprovider", apkFile);
-        install.setDataAndType(uri, "application/vnd.android.package-archive");
-        install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        install.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        ctx.startActivity(install);
+        try {
+            Intent install = new Intent(Intent.ACTION_VIEW);
+            Uri uri = FileProvider.getUriForFile(ctx, "com.moodflow.app.fileprovider", apkFile);
+            install.setDataAndType(uri, "application/vnd.android.package-archive");
+            install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            install.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            ctx.startActivity(install);
+        } catch (Exception e) {
+            Log.e(TAG, "installApk failed", e);
+            webView.post(() -> {
+                try {
+                    webView.evaluateJavascript(
+                        "try{toast('Install failed: open file manually')}catch(e){}", null);
+                } catch (Exception ignored) {}
+            });
+        }
     }
 
     @JavascriptInterface
